@@ -1,0 +1,10 @@
+[Unit]
+Description=PhenoCam capture timer
+
+[Timer]
+OnCalendar=*:0,30
+AccuracySec=10s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

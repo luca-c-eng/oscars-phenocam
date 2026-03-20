@@ -1,0 +1,16 @@
+# /etc/udev/rules.d/99-phenocam-usb.rules
+# Detects USB storage insertion and removal and launches PhenoCam handlers.
+#
+# Requirement: USB drive must be formatted as FAT32.
+# Installation:
+#   sudo cp 99-phenocam-usb.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+
+# USB insertion: wait for automount then notify PhenoCam
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", \
+  ENV{ID_BUS}=="usb", \
+  RUN+="/bin/systemd-run --no-block /usr/local/lib/phenocam/bin/phenocam-usb-attach.sh"
+
+# USB removal: notify PhenoCam for cleanup and fallback
+ACTION=="remove", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", \
+  RUN+="/bin/systemd-run --no-block /usr/local/lib/phenocam/bin/phenocam-usb-detach.sh"

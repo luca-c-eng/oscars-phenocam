@@ -1,0 +1,45 @@
+# PhenoCam — Tested and certified versions
+# Update this file after every verified installation.
+# DO NOT install on different versions without running the full test suite.
+
+# ─── HARDWARE ────────────────────────────────────────────────────────────────
+HARDWARE_BOARD        = Raspberry Pi 3B+
+HARDWARE_CAMERA       = Raspberry Pi Camera Module 3 (imx708_wide)
+HARDWARE_STORAGE      = MicroSD Industrial 8GB (class 10 or higher)
+
+# ─── OPERATING SYSTEM ────────────────────────────────────────────────────────
+OS_NAME               = Debian GNU/Linux 13 (trixie)
+OS_VERSION_ID         = 13
+OS_CODENAME           = trixie
+OS_VARIANT            = Raspberry Pi OS 64-bit Lite
+OS_RELEASE_DATE       = 2025-12-04
+KERNEL                = 6.12.75+rpt-rpi-v8 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1 (2026-03-11)
+ARCH                  = aarch64
+
+# ─── INSTALLATION TOOLS (used on PC, not on RPi) ─────────────────────────────
+IMAGER_NAME           = Raspberry Pi Imager
+IMAGER_VERSION        = v2.0.6
+OS_IMAGE_SOURCE       = Raspberry Pi OS (Other) → Raspberry Pi OS Lite (64-bit)
+OS_IMAGE_DESCRIPTION  = A port of Debian Trixie with no desktop environment
+                        (Compatible with Raspberry Pi 3/4/400/5)
+
+# ─── SOFTWARE DEPENDENCIES ───────────────────────────────────────────────────
+RPICAM_APPS           = v1.10.1 (2025-11-28)
+LIBCAMERA             = v0.6.0+rpt20251202
+EXIFTOOL              = 13.25 (package: libimage-exiftool-perl)
+CURL                  = present at /usr/bin/curl
+SFTP                  = present at /usr/bin/sftp
+FLOCK                 = present at /usr/bin/flock
+BASH                  = present at /usr/bin/bash
+RUNUSER               = present at /usr/sbin/runuser
+
+# ─── PHENOCAM SOFTWARE ───────────────────────────────────────────────────────
+PHENOCAM_VERSION      = 1.2.2
+PHENOCAM_INSTALL      = /usr/local/lib/phenocam/
+PHENOCAM_CONFIG       = /etc/phenocam/
+PHENOCAM_LOG          = /var/log/phenocam/phenocam.log
+PHENOCAM_RAMDISK      = /run/phenocam/ (tmpfs 200MB)
+
+# ─── NOTES ───────────────────────────────────────────────────────────────────
+# Tested and verified on: Phenocam01, Phenocam02, Phenocam03, Phenocam04
+# Last verified: 2026-03-19

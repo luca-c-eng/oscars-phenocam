@@ -1,0 +1,11 @@
+[Unit]
+Description=RAMDISK for PhenoCam queue
+
+[Mount]
+What=tmpfs
+Where=/run/phenocam
+Type=tmpfs
+Options=size=200m,mode=0750
+
+[Install]
+WantedBy=multi-user.target

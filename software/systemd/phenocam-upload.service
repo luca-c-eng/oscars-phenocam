@@ -1,0 +1,22 @@
+[Unit]
+Description=PhenoCam upload drain
+After=network-online.target run-phenocam.mount
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=phenocam
+Group=phenocam
+ExecStart=/usr/local/lib/phenocam/bin/phenocam-upload.sh
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/phenocam /var/log/phenocam /var/lib/phenocam /media /mnt /etc/phenocam
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

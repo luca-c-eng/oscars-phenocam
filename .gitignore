@@ -1,0 +1,36 @@
+# PhenoCam — .gitignore
+# This file tells Git which files to never track.
+
+# ── CREDENTIALS — never commit these ──────────────────────────────────────
+# FTP and SFTP credentials contain plain-text passwords.
+# Create these files manually on the RPi during installation.
+software/config/ftp_credentials.txt
+ftp_credentials.txt
+
+# SSH private keys
+*.pem
+phenocam_key
+id_ed25519
+id_rsa
+
+# ── SYSTEM FILES ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── EDITOR AND IDE ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── LOGS AND RUNTIME DATA ──────────────────────────────────────────────────
+*.log
+*.lock
+
+# ── CAPTURED DATA ─────────────────────────────────────────────────────────
+# Image and metadata files should not be committed to the repository.
+*.jpg
+*.jpeg
+*.meta

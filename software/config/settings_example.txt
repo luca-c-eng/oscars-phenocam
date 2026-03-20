@@ -1,0 +1,45 @@
+# settings.txt (positional format)
+# One value per line. Empty lines and comments (#) are ignored.
+# Fields are read by position — do not change the order.
+
+# 1) SITENAME — unique identifier for this PhenoCam station
+mysite_phenocam01
+
+# 2) UTC_OFFSET — UTC offset (e.g. +1, +2, 0, -5)
++1
+
+# 3) TZ_LABEL — full timezone name (e.g. Europe/Rome, America/New_York)
+Europe/Rome
+
+# 4) START_HOUR — first hour of the day to capture images (0-23)
+7
+
+# 5) END_HOUR — last hour of the day to capture images (0-23)
+19
+
+# 6) INTERVAL_MIN — interval between captures in minutes
+30
+
+# 7) IFACE — network interface for IP/MAC in metadata (optional)
+#    Leave empty for auto-detect.
+#    RPi 3B+ typical values: eth0 (Ethernet), wlan0 (WiFi), usb0 (OTG Ethernet)
+eth0
+
+# 8) SFTP_USER — SFTP username on the remote server
+phenocam
+
+# 9) NET_MODE — network mode: auto | ethernet | wifi
+auto
+
+# 10) RAM_MIN_FREE_MB — RAMDISK free space threshold before spillover to USB/SD
+20
+
+# 11) SD_MAX_USED_PCT — SD card usage threshold; captures stop if exceeded
+80
+
+# 12) USB_MOUNT_BASES — colon-separated base paths to scan for mounted USB drives
+/media:/mnt
+
+# 13) USB_MAX_USED_PCT — USB usage threshold; spills over to SD if exceeded
+#     Higher than SD (default 90) because USB is removable and replaceable.
+90

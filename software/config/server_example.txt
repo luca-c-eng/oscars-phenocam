@@ -1,0 +1,4 @@
+# server.txt — list of SFTP servers, one hostname per line.
+# Leave this file empty to disable SFTP upload.
+# The software reads this file at every upload cycle.
+example.sftp-server.org

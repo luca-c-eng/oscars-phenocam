@@ -1,0 +1,15 @@
+[Unit]
+Description=PhenoCam RAMDISK init
+After=run-phenocam.mount network-online.target
+Requires=run-phenocam.mount
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mkdir -p /run/phenocam/queue /run/phenocam/staging
+ExecStart=/bin/chown -R phenocam:phenocam /run/phenocam
+ExecStart=/usr/sbin/runuser -u phenocam -- /usr/local/lib/phenocam/bin/phenocam-run.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

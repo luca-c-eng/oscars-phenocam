@@ -1,0 +1,21 @@
+[Unit]
+Description=PhenoCam capture cycle (VIS)
+After=run-phenocam.mount
+
+[Service]
+Type=oneshot
+User=phenocam
+Group=phenocam
+ExecStart=/usr/local/lib/phenocam/bin/phenocam-capture.sh
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/phenocam /var/log/phenocam /var/lib/phenocam /media /mnt
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

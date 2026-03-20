@@ -1,0 +1,11 @@
+[Unit]
+Description=PhenoCam upload timer
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=9min
+AccuracySec=30s
+Persistent=false
+
+[Install]
+WantedBy=timers.target
