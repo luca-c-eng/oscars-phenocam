@@ -38,7 +38,7 @@ a remote server — all without human intervention.
 | Component | Tested version |
 |-----------|---------------|
 | Board | Raspberry Pi 3B+ |
-| Camera | Raspberry Pi Camera Module 3 (imx708_wide) |
+| Camera | Raspberry Pi Camera Module 3 (imx708) |
 | Storage | MicroSD Industrial 8GB, class 10+ |
 | OS | Raspberry Pi OS 64-bit Lite — Debian 13 trixie (2025-12-04) |
 
