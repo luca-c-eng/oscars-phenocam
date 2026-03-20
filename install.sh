@@ -143,9 +143,9 @@ log_step "Cloning repository..."
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   log_warn "Repository already exists at $INSTALL_DIR. Pulling latest changes..."
-  git -C "$INSTALL_DIR" pull --ff-only
+  sudo git -C "$INSTALL_DIR" pull --ff-only
 else
-  git clone --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"
+   sudo git clone --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
 log_ok "Repository cloned to: $INSTALL_DIR"
 
