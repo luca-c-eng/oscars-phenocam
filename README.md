@@ -165,7 +165,7 @@ sudo nano /etc/phenocam/ftp_credentials.txt  # 5 lines: host, port, path, user, 
 > If the camera was just enabled for the first time, a reboot is required:
 > `sudo reboot`
 
-For **SFTP** see the SFTP Section below
+For **SFTP** see the [SFTP Setup](#sftp-setup) section below.
 
 ### USB drive requirement
 
