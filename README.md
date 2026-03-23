@@ -114,7 +114,7 @@ oscars-phenocam/
 ## Quick Installation
 
 > **Full step-by-step instructions** with technical explanations are in the
-> installation guide (see Releases).
+> installation guide (will be published in the Releases).
 
 ### Prerequisites
 
@@ -147,14 +147,17 @@ This single command will:
 
 ### After installation
 
-For data transfer, you can choose between two protocols: FTP and SFTP. The latter is recommended for security reasons.
+Data transfer supports two upload protocols — FTP and SFTP. SFTP is recommended for security (SSH key authentication, no password transmitted over the network).
 
-For FTP, two files require your specific values:
+For **both protocols**, edit the station settings first:
 
 ```bash
 # 1. Set your station name and parameters
 sudo nano /etc/phenocam/settings.txt        # edit SITENAME (line 1) at minimum
+```
 
+For **FTP** — edit credentials:
+```bash
 # 2. Set FTP server credentials
 sudo nano /etc/phenocam/ftp_credentials.txt  # 5 lines: host, port, path, user, password
 ```
@@ -162,11 +165,11 @@ sudo nano /etc/phenocam/ftp_credentials.txt  # 5 lines: host, port, path, user, 
 > If the camera was just enabled for the first time, a reboot is required:
 > `sudo reboot`
 
-For SFTP see the SFTP Section
+For **SFTP** see the SFTP Section below
 
 ### USB drive requirement
 
-USB drives used for spillover storage must be **formatted as FAT32**.
+When USB drives are used for spillover storage, they must be **formatted as FAT32**.
 
 ---
 
