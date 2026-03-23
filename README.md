@@ -319,11 +319,6 @@ for Research & Society) project, funded by the European Commission (grant 101129
 
 This software is released under the [MIT License](LICENSE).
 
-> **Note for project team:** the choice of MIT license should be confirmed
-> with Koen Hufkens and the OSCARS project team before the public release,
-> to ensure alignment with project requirements and any EU open science
-> obligations.
-
 ---
 
 ## Contributing
