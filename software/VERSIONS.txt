@@ -4,7 +4,7 @@
 
 # ─── HARDWARE ────────────────────────────────────────────────────────────────
 HARDWARE_BOARD        = Raspberry Pi 3B+
-HARDWARE_CAMERA       = Raspberry Pi Camera Module 3 (imx708_wide)
+HARDWARE_CAMERA       = Raspberry Pi Camera Module 3 (imx708)
 HARDWARE_STORAGE      = MicroSD Industrial 8GB (class 10 or higher)
 
 # ─── OPERATING SYSTEM ────────────────────────────────────────────────────────
