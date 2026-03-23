@@ -115,7 +115,7 @@ Phenocam03.
 
 ## [Unreleased]
 
-### TODO (eventually - to evaluete)
+### TODO (eventually - to evaluate)
 - PhenoCam Network directory structure compatibility (sitename/YYYY/MM/)
 - Clarify .meta format requirements with PhenoCam Network
 - Manual stop/start commands (phenocam-stop, phenocam-start)
