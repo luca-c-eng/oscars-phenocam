@@ -147,7 +147,9 @@ This single command will:
 
 ### After installation
 
-Two files require your specific values:
+For data transfer, you can choose between two protocols: FTP and SFTP. The latter is recommended for security reasons.
+
+For FTP, two files require your specific values:
 
 ```bash
 # 1. Set your station name and parameters
@@ -159,6 +161,8 @@ sudo nano /etc/phenocam/ftp_credentials.txt  # 5 lines: host, port, path, user, 
 
 > If the camera was just enabled for the first time, a reboot is required:
 > `sudo reboot`
+
+For SFTP see the SFTP Section
 
 ### USB drive requirement
 
