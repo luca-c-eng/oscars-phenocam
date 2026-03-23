@@ -115,10 +115,7 @@ Phenocam03.
 
 ## [Unreleased]
 
-### TODO
-- Automatic installation script from GitHub (install.sh)
-- Automatic USB mount when RAMDISK falls below threshold
-- Full SFTP support (remote server configuration)
-- Manual stop/start commands (phenocam-stop, phenocam-start)
+### TODO (eventually - to evaluete)
 - PhenoCam Network directory structure compatibility (sitename/YYYY/MM/)
 - Clarify .meta format requirements with PhenoCam Network
+- Manual stop/start commands (phenocam-stop, phenocam-start)
