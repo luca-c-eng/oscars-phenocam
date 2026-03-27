@@ -28,7 +28,7 @@ list_pairs_in_dir() {
 
 # upload_dir_once — drains one queue directory via SFTP.
 upload_dir_once() {
-  local dir="$1" server_list="$2" key_path="$3" known_hosts="$4"
+  local dir="$1" server_list="$2" key_path="$3" known_hosts="$4" delete_on_success="${5:-false}"
   local base jpg meta
 
   for base in $(list_pairs_in_dir "$dir"); do
@@ -42,8 +42,12 @@ upload_dir_once() {
     fi
 
     if upload_pair_sftp "$jpg" "$meta" "$server_list" "$key_path" "$known_hosts"; then
-      rm -f "$jpg" "$meta"
-      info "SFTP uploaded and removed: ${base} from ${dir}"
+      if [[ "$delete_on_success" == true ]]; then
+        rm -f "$jpg" "$meta"
+        info "SFTP uploaded and removed: ${base} from ${dir}"
+      else
+        info "SFTP uploaded: ${base} from ${dir}"
+      fi
     else
       warn "SFTP upload failed for: ${base} (will retry next cycle)"
       return 11
@@ -55,7 +59,7 @@ upload_dir_once() {
 
 # upload_dir_once_ftp — drains one queue directory via FTP.
 upload_dir_once_ftp() {
-  local dir="$1" credentials="$2"
+  local dir="$1" credentials="$2" delete_on_success="${3:-false}"
   local base jpg meta
 
   for base in $(list_pairs_in_dir "$dir"); do
@@ -69,8 +73,12 @@ upload_dir_once_ftp() {
     fi
 
     if upload_pair_ftp "$jpg" "$meta" "$credentials"; then
-      rm -f "$jpg" "$meta"
-      info "FTP uploaded and removed: ${base} from ${dir}"
+      if [[ "$delete_on_success" == true ]]; then
+        rm -f "$jpg" "$meta"
+        info "FTP uploaded and removed: ${base} from ${dir}"
+      else
+        info "FTP uploaded: ${base} from ${dir}"
+      fi
     else
       warn "FTP upload failed for: ${base} (will retry next cycle)"
       return 11
@@ -87,9 +95,20 @@ drain_all_queues() {
   local ftp_credentials="/etc/phenocam/ftp_credentials.txt"
   local use_sftp=false
   local use_ftp=false
+  local sftp_delete=false
+  local ftp_delete=false
 
   [[ -s "$server_list" ]]      && use_sftp=true
   [[ -s "$ftp_credentials" ]]  && use_ftp=true
+
+    # Delete local files only after the last enabled upload target succeeds.
+  if [[ "$use_sftp" == true && "$use_ftp" == false ]]; then
+    sftp_delete=true
+  fi
+
+  if [[ "$use_ftp" == true ]]; then
+    ftp_delete=true
+  fi
 
   if [[ "$use_sftp" == false && "$use_ftp" == false ]]; then
     warn "No upload method configured (server.txt and ftp_credentials.txt are both empty)"
@@ -106,18 +125,18 @@ drain_all_queues() {
   sd="$(sd_queue_dir)"
   ram="$(ram_queue_dir)"
 
-  # SFTP drain (original behaviour — unchanged)
+  # SFTP drain
   if [[ "$use_sftp" == true ]]; then
-    [[ -n "$u" ]] && { upload_dir_once "$u" "$server_list" "$key_path" "$known_hosts" || return $?; }
-    upload_dir_once "$sd"  "$server_list" "$key_path" "$known_hosts" || return $?
-    upload_dir_once "$ram" "$server_list" "$key_path" "$known_hosts" || return $?
+    [[ -n "$u" ]] && { upload_dir_once "$u" "$server_list" "$key_path" "$known_hosts" "$sftp_delete" || return $?; }
+    upload_dir_once "$sd"  "$server_list" "$key_path" "$known_hosts" "$sftp_delete" || return $?
+    upload_dir_once "$ram" "$server_list" "$key_path" "$known_hosts" "$sftp_delete" || return $?
   fi
 
   # FTP drain
   if [[ "$use_ftp" == true ]]; then
-    [[ -n "$u" ]] && { upload_dir_once_ftp "$u" "$ftp_credentials" || return $?; }
-    upload_dir_once_ftp "$sd"  "$ftp_credentials" || return $?
-    upload_dir_once_ftp "$ram" "$ftp_credentials" || return $?
+    [[ -n "$u" ]] && { upload_dir_once_ftp "$u" "$ftp_credentials" "$ftp_delete" || return $?; }
+    upload_dir_once_ftp "$sd"  "$ftp_credentials" "$ftp_delete" || return $?
+    upload_dir_once_ftp "$ram" "$ftp_credentials" "$ftp_delete" || return $?
   fi
 
   return 0
