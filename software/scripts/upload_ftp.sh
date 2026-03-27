@@ -16,14 +16,16 @@ IFS=$'\n\t'
 #   4) FTP_USER        e.g. myuser
 #   5) FTP_PASS        e.g. mypassword
 #
-# Remote path structure (created automatically):
-#   FTP_REMOTE_BASE / SITENAME / YYYY_MM_DD / filename.jpg
+# Remote path structure (created automatically under FTP_REMOTE_BASE):
+#   general -> FTP_REMOTE_BASE / <sitename> / <YYYY> / <MM> / filename
+#   icos    -> FTP_REMOTE_BASE / data / <sitename> / filename
 #
 # Requirements:
 #   - curl available in PATH
 #   - FTP server must support passive mode (PASV)
 #   - FTP_REMOTE_BASE directory must already exist on the server
 #   - SITENAME must be exported in the environment (set by config_read.sh)
+#   - REMOTE_LAYOUT must be exported in the environment (set by config_read.sh)
 
 read_ftp_credentials() {
   local f="$1"
@@ -64,19 +66,33 @@ upload_pair_ftp() {
   [[ -n "${FTP_USER:-}" ]]        || return 18
   [[ -n "${FTP_PASS:-}" ]]        || return 19
 
-  # Extract date part from filename (format: SITENAME_hostname_YYYY_MM_DD_HHMMSS.jpg)
-  local base
+  # Build remote directory from filename and configured layout.
+  local base year month
   base="$(basename "$jpg" .jpg)"
-  local date_part
-  date_part="$(echo "$base" | grep -oE '[0-9]{4}_[0-9]{2}_[0-9]{2}' | head -1 || true)"
 
-  # Fallback to current date if extraction fails
-  if [[ -z "$date_part" ]]; then
-    date_part="$(date +%Y_%m_%d)"
+  year="$(echo "$base" | grep -oE '[0-9]{4}_[0-9]{2}_[0-9]{2}' | head -1 | cut -d_ -f1 || true)"
+  month="$(echo "$base" | grep -oE '[0-9]{4}_[0-9]{2}_[0-9]{2}' | head -1 | cut -d_ -f2 || true)"
+
+  # Fallback to current year/month if extraction fails.
+  if [[ -z "$year" || -z "$month" ]]; then
+    year="$(date +%Y)"
+    month="$(date +%m)"
   fi
 
-  local remote_dir="${FTP_REMOTE_BASE}/${SITENAME:-unknown}/${date_part}"
-  local ftp_base="ftp://${FTP_HOST}:${FTP_PORT}"
+  local remote_dir ftp_base
+  ftp_base="ftp://${FTP_HOST}:${FTP_PORT}"
+
+  case "${REMOTE_LAYOUT:-general}" in
+    icos)
+      remote_dir="${FTP_REMOTE_BASE%/}/data/${SITENAME:-unknown}"
+      ;;
+    general)
+      remote_dir="${FTP_REMOTE_BASE%/}/${SITENAME:-unknown}/${year}/${month}"
+      ;;
+    *)
+      return 22
+      ;;
+  esac
 
   # Create remote subdirectory (--ftp-create-dirs handles this automatically)
   # The .keep upload may fail on some servers but --ftp-create-dirs is also
