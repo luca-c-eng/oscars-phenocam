@@ -23,7 +23,6 @@ read_settings() {
   INTERVAL_MIN="${L[5]}"
 
   # Optional fields (backward compatible — defaults applied if missing):
-  # Optional fields (backward compatible — defaults applied if missing):
   IFACE="${L[6]:-}"                        # e.g. eth0, wlan0, usb0 — empty = auto-detect
   SFTP_USER="${L[7]:-}"                    # SFTP username on the remote server
 
