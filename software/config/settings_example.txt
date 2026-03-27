@@ -43,3 +43,8 @@ auto
 # 13) USB_MAX_USED_PCT — USB usage threshold; spills over to SD if exceeded
 #     Higher than SD (default 90) because USB is removable and replaceable.
 90
+
+# 14) REMOTE_LAYOUT — remote directory layout: general | icos
+#     general -> <sitename>/<YYYY>/<MM>/
+#     icos    -> data/<sitename>/
+general
