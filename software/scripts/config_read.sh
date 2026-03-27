@@ -23,6 +23,7 @@ read_settings() {
   INTERVAL_MIN="${L[5]}"
 
   # Optional fields (backward compatible — defaults applied if missing):
+  # Optional fields (backward compatible — defaults applied if missing):
   IFACE="${L[6]:-}"                        # e.g. eth0, wlan0, usb0 — empty = auto-detect
   SFTP_USER="${L[7]:-}"                    # SFTP username on the remote server
 
@@ -31,10 +32,11 @@ read_settings() {
   SD_MAX_USED_PCT="${L[10]:-80}"           # SD usage threshold (%); captures stop if exceeded
   USB_MOUNT_BASES="${L[11]:-/media:/mnt}"  # colon-separated base paths to scan for USB mounts
   USB_MAX_USED_PCT="${L[12]:-90}"          # USB usage threshold (%); spills to SD if exceeded
+  REMOTE_LAYOUT="${L[13]:-general}"        # general | icos
 
   export SITENAME UTC_OFFSET TZ_LABEL START_HOUR END_HOUR INTERVAL_MIN
   export IFACE SFTP_USER NET_MODE RAM_MIN_FREE_MB SD_MAX_USED_PCT
-  export USB_MOUNT_BASES USB_MAX_USED_PCT
+  export USB_MOUNT_BASES USB_MAX_USED_PCT REMOTE_LAYOUT
 }
 
 # within_window — returns 0 if the current hour is within [START_HOUR, END_HOUR).
