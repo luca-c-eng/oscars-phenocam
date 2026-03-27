@@ -13,8 +13,11 @@ IFS=$'\n\t'
 #
 # Requirements:
 #   - SFTP_USER must be exported in the environment (set by config_read.sh)
+#   - REMOTE_LAYOUT must be exported in the environment (set by config_read.sh)
 #   - StrictHostKeyChecking is enforced (known_hosts must contain the server fingerprint)
-#   - Remote directory: configured as TBD_REMOTE_DIR (update when server is available)
+#   - Remote directory layout:
+#       general -> <sitename>/<YYYY>/<MM>/
+#       icos    -> data/<sitename>/
 
 upload_pair_sftp() {
   local jpg="$1"
@@ -33,8 +36,31 @@ upload_pair_sftp() {
 
   command -v sftp >/dev/null 2>&1 || return 16
 
-  # Remote directory — update this when the server contract is defined.
-  local remote_dir="TBD_REMOTE_DIR"
+  # Build remote directory from filename and configured layout.
+  local base year month
+  base="$(basename "$jpg" .jpg)"
+
+  year="$(echo "$base" | grep -oE '[0-9]{4}_[0-9]{2}_[0-9]{2}' | head -1 | cut -d_ -f1 || true)"
+  month="$(echo "$base" | grep -oE '[0-9]{4}_[0-9]{2}_[0-9]{2}' | head -1 | cut -d_ -f2 || true)"
+
+  # Fallback to current year/month if extraction fails.
+  if [[ -z "$year" || -z "$month" ]]; then
+    year="$(date +%Y)"
+    month="$(date +%m)"
+  fi
+
+  local remote_dir
+  case "${REMOTE_LAYOUT:-general}" in
+    icos)
+      remote_dir="data/${SITENAME:-unknown}"
+      ;;
+    general)
+      remote_dir="${SITENAME:-unknown}/${year}/${month}"
+      ;;
+    *)
+      return 17
+      ;;
+  esac
 
   local host
   while IFS= read -r host; do
@@ -45,7 +71,18 @@ upload_pair_sftp() {
     batch_file="$(mktemp)"
 
     {
-      echo "mkdir ${remote_dir}"
+      case "${REMOTE_LAYOUT:-general}" in
+        icos)
+          echo "-mkdir data"
+          echo "-mkdir data/${SITENAME:-unknown}"
+          ;;
+        general)
+          echo "-mkdir ${SITENAME:-unknown}"
+          echo "-mkdir ${SITENAME:-unknown}/${year}"
+          echo "-mkdir ${SITENAME:-unknown}/${year}/${month}"
+          ;;
+      esac
+
       echo "cd ${remote_dir}"
       echo "put \"${jpg}\""
       echo "put \"${meta}\""
