@@ -48,3 +48,21 @@ auto
 #     general -> <sitename>/<YYYY>/<MM>/
 #     icos    -> data/<sitename>/
 general
+
+# 15) SITE_LAT — site latitude in decimal degrees (use negative for South)
+nd
+
+# 16) SITE_LON — site longitude in decimal degrees (use negative for West)
+nd
+
+# 17) SITE_ELEV_M — site elevation above sea level in meters
+nd
+
+# 18) SITE_START_DATE — site start date in YYYY-MM-DD format
+nd
+
+# 19) SITE_END_DATE — site end date in YYYY-MM-DD format
+nd
+
+# 20) SITE_NIMAGE — expected or known image count for analysis metadata
+nd
