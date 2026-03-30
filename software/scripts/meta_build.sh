@@ -37,6 +37,7 @@ build_meta() {
   fi
 
   {
+    echo "[system]"
     echo "sitename=${SITENAME:-}"
     echo "hostname=$(hostname -f 2>/dev/null || hostname)"
     echo "timestamp=$(date -Is)"
