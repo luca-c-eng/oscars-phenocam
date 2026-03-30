@@ -7,7 +7,7 @@ IFS=$'\n\t'
 # =============================================================================
 # Usage (run as any user with sudo privileges):
 #
-#   curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/main/install.sh | bash
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.3.0/install.sh | bash
 #
 # What this script does:
 #   1. Checks prerequisites (OS, hardware, network)
@@ -28,7 +28,7 @@ IFS=$'\n\t'
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/luca-c-eng/oscars-phenocam.git"
-REPO_BRANCH="main"
+REPO_BRANCH="dev/v1.3.0"
 INSTALL_DIR="/opt/oscars-phenocam"
 SOFTWARE_DIR="${INSTALL_DIR}/software"
 LIB_DIR="/usr/local/lib/phenocam"
@@ -260,6 +260,13 @@ auto
 80
 /media:/mnt
 90
+general
+nd
+nd
+nd
+nd
+nd
+nd
 SETTINGS
   log_ok "settings.txt created (edit to set your SITENAME and parameters)"
   log_warn "ACTION REQUIRED: sudo nano ${CONFIG_DIR}/settings.txt — set SITENAME (line 1)"
@@ -393,8 +400,8 @@ echo -e "${GREEN}     sudo nano /etc/phenocam/ftp_credentials.txt${NC}"
 echo ""
 echo -e "${YELLOW}  SFTP (recommended for security — SSH key, no password over network):${NC}"
 echo -e "${GREEN}     1. Send the public key above to your SFTP server administrator${NC}"
-echo -e "${GREEN}     2. sudo nano /etc/phenocam/server.txt  (add server hostname)${NC}"
+echo -e "${GREEN}     2. sudo nano /etc/phenocam/server.txt  (add one or more server hostnames)${NC}"
 echo -e "${GREEN}     3. sudo ssh-keyscan -H <hostname> >> /etc/phenocam/known_hosts${NC}"
 echo -e "${GREEN}     4. Edit line 8 of settings.txt (SFTP_USER)${NC}"
-echo -e "${GREEN}     5. Edit remote_dir in upload_sftp.sh (TBD_REMOTE_DIR)${NC}"
+echo -e "${GREEN}     5. Edit line 14 of settings.txt (REMOTE_LAYOUT: general or icos)${NC}"
 echo ""
