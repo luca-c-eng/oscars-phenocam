@@ -42,6 +42,14 @@ build_meta() {
     echo "timestamp=$(date -Is)"
     echo "tz=${TZ_LABEL:-}"
     echo "utc_offset=${UTC_OFFSET:-}"
+
+    echo "lat=${SITE_LAT:-nd}"
+    echo "lon=${SITE_LON:-nd}"
+    echo "elev=${SITE_ELEV_M:-nd}"
+    echo "start_date=${SITE_START_DATE:-nd}"
+    echo "end_date=${SITE_END_DATE:-nd}"
+    echo "nimage=${SITE_NIMAGE:-nd}"
+
     echo "iface=${iface}"
     echo "ip=${ip4}"
     echo "mac=${mac}"
