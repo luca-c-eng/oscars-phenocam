@@ -40,7 +40,7 @@ cycle_once() {
 
   local ts base jpg meta
   ts="$(date +'%Y_%m_%d_%H%M%S')"
-  base="${SITENAME:-site}_$(hostname -s | tr '[:upper:]' '[:lower:]')_${ts}"
+  base="${SITENAME:-site}_${ts}"
   jpg="${ram_base}/staging/${base}.jpg"
   meta="${ram_base}/staging/${base}.meta"
 
