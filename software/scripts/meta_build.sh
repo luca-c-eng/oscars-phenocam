@@ -26,10 +26,11 @@ build_meta() {
 
   command -v exiftool >/dev/null 2>&1 || return 11
 
-  local iface ip4 mac
+  local iface ip4 mac now_iso
   iface="$(get_iface)"
   ip4=""
   mac=""
+  now_iso="$(date -Is)"
 
   if [[ -n "$iface" ]]; then
     ip4="$(ip -4 -o addr show "$iface" | awk '{print $4}' | cut -d/ -f1 || true)"
@@ -40,10 +41,10 @@ build_meta() {
     echo "[system]"
     echo "sitename=${SITENAME:-}"
     echo "hostname=$(hostname -f 2>/dev/null || hostname)"
-    echo "timestamp=$(date -Is)"
+    echo "timestamp=${now_iso}"
 
     # NetCam-compatible alias of the acquisition timestamp.
-    echo "datetime_original=\"$(date -Is)\""
+    echo "datetime_original=\"${now_iso}\""
 
     echo "tz=${TZ_LABEL:-}"
     echo "utc_offset=${UTC_OFFSET:-}"
