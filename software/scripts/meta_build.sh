@@ -41,8 +41,15 @@ build_meta() {
     echo "sitename=${SITENAME:-}"
     echo "hostname=$(hostname -f 2>/dev/null || hostname)"
     echo "timestamp=$(date -Is)"
+
+    # NetCam-compatible alias of the acquisition timestamp.
+    echo "datetime_original=\"$(date -Is)\""
+
     echo "tz=${TZ_LABEL:-}"
     echo "utc_offset=${UTC_OFFSET:-}"
+
+    # Upload/network mode currently selected for this station.
+    echo "network=${REMOTE_LAYOUT:-general}"
 
     echo "lat=${SITE_LAT:-nd}"
     echo "lon=${SITE_LON:-nd}"
