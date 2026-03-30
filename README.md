@@ -1,6 +1,6 @@
 # oscars-phenocam
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: BSD 3--Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.2.2-blue.svg)](software/VERSION)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18800314.svg)](https://doi.org/10.5281/zenodo.18800314)
 
@@ -317,7 +317,7 @@ for Research & Society) project, funded by the European Commission (grant 101129
 
 ## License
 
-This software is released under the [MIT License](LICENSE).
+This software is released under the [BSD 3-Clause License](LICENSE).
 
 ---
 
