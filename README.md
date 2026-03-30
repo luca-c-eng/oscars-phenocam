@@ -27,7 +27,7 @@ The current `dev/v1.3.0` branch is focused on:
 
 ## Key Features
 
-- Scheduled captures at `:00` and `:30` of every hour within a configurable time window
+- Scheduled captures at `:00` and `:30` of every hour within a configurable time window  (the capture time fraction can also be freely defined)
 - Structured per-image `.meta` files with:
   - `[system]`
   - `[capture_params_fixed]`
