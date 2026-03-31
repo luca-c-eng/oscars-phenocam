@@ -166,15 +166,21 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/bin/phenocam-run.sh"
   "${SOFTWARE_DIR}/bin/phenocam-usb-attach.sh"
   "${SOFTWARE_DIR}/bin/phenocam-usb-detach.sh"
+
   "${SOFTWARE_DIR}/scripts/common.sh"
+  "${SOFTWARE_DIR}/scripts/config_read.sh"
   "${SOFTWARE_DIR}/scripts/cycle.sh"
   "${SOFTWARE_DIR}/scripts/meta_build.sh"
+  "${SOFTWARE_DIR}/scripts/queue_manager.sh"
+  "${SOFTWARE_DIR}/scripts/upload_sftp.sh"
   "${SOFTWARE_DIR}/scripts/upload_ftp.sh"
   "${SOFTWARE_DIR}/scripts/uploader_daemon.sh"
+
+  "${SOFTWARE_DIR}/config/phenocam.logrotate"
+
   "${SOFTWARE_DIR}/systemd/phenocam-init.service"
   "${SOFTWARE_DIR}/systemd/phenocam-capture.timer"
   "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules"
-  "${SOFTWARE_DIR}/config/phenocam.logrotate"
 )
 
 for f in "${CRITICAL_FILES[@]}"; do
@@ -400,7 +406,9 @@ fi
 
 # Remind about required configuration
 echo -e "${YELLOW}${BOLD}  Required actions before the system can upload images:${NC}"
-echo -e "${GREEN}  1. Set station name: sudo nano /etc/phenocam/settings.txt${NC}"
+echo -e "${GREEN}  1. Set station name: "
+echo -e "${GREEN}     sudo nano /etc/phenocam/settings.txt${NC}"
+echo ""
 echo -e "${YELLOW}     (edit SITENAME on line 1 at minimum)${NC}"
 echo ""
 echo -e "${YELLOW}  Choose your upload protocol:${NC}"
