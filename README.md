@@ -1,7 +1,7 @@
 # oscars-phenocam
 
-[![License: BSD 3--Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.2-blue.svg)](software/VERSION)
+[![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](software/VERSION)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18800314.svg)](https://doi.org/10.5281/zenodo.18800314)
 
 **Open and FAIR Integrated Phenology Monitoring System — PhenoCam Software**
@@ -27,7 +27,7 @@ The current `dev/v1.3.0` branch is focused on:
 
 ## Key Features
 
-- Scheduled captures at `:00` and `:30` of every hour within a configurable time window  (the capture time fraction can also be freely defined)
+- Scheduled captures at `:00` and `:30` of every hour within a configurable time window.
 - Structured per-image `.meta` files with:
   - `[system]`
   - `[capture_params_fixed]`
