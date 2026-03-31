@@ -406,9 +406,8 @@ fi
 
 # Remind about required configuration
 echo -e "${YELLOW}${BOLD}  Required actions before the system can upload images:${NC}"
-echo -e "${GREEN}  1. Set station name: "
+echo -e "${GREEN}  1. Set station name:${NC}"
 echo -e "${GREEN}     sudo nano /etc/phenocam/settings.txt${NC}"
-echo ""
 echo -e "${YELLOW}     (edit SITENAME on line 1 at minimum)${NC}"
 echo ""
 echo -e "${YELLOW}  Choose your upload protocol:${NC}"
