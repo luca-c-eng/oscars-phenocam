@@ -231,8 +231,8 @@ If a value is not yet available, use `nd`.
 | 1 | SITENAME | — | Unique station identifier used in filenames and upload paths |
 | 2 | UTC_OFFSET | +1 | UTC offset (e.g. `+1`, `+2`, `0`, `-5`) |
 | 3 | TZ_LABEL | Europe/Rome | Full timezone name |
-| 4 | START_HOUR | 7 | First capture hour (0–23) |
-| 5 | END_HOUR | 19 | End hour of capture window (0–23) |
+| 4 | START_HOUR | 6 | First capture hour (0–23) |
+| 5 | END_HOUR | 22 | End hour of capture window (0–23) |
 | 6 | INTERVAL_MIN | 30 | Interval between captures in minutes |
 | 7 | IFACE | eth0 | Network interface for metadata (`empty = auto-detect`) |
 | 8 | SFTP_USER | phenocam | SFTP username on remote server |
