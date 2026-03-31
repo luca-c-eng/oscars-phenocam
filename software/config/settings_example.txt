@@ -12,10 +12,10 @@ mysite_phenocam01
 Europe/Rome
 
 # 4) START_HOUR — first hour of the day to capture images (0-23)
-7
+6
 
 # 5) END_HOUR — last hour of the day to capture images (0-23)
-19
+22
 
 # 6) INTERVAL_MIN — interval between captures in minutes
 30
