@@ -46,12 +46,12 @@ read_settings() {
   export SITE_LAT SITE_LON SITE_ELEV_M SITE_START_DATE SITE_END_DATE SITE_NIMAGE
 }
 
-# within_window — returns 0 if the current hour is within [START_HOUR, END_HOUR).
-# Requires read_settings() to have been called first.
+# within_window
 within_window() {
-  local h_now
-  h_now="$(date +%H)"
-  # Simple window: start <= now < end.
-  # Note: windows crossing midnight are not yet supported (TBD).
-  [[ "$h_now" -ge "$START_HOUR" && "$h_now" -lt "$END_HOUR" ]]
+  local h_now start_h end_h
+  h_now=$((10#$(date +%H)))
+  start_h=$((10#${START_HOUR}))
+  end_h=$((10#${END_HOUR}))
+
+  [[ "$h_now" -ge "$start_h" && "$h_now" -lt "$end_h" ]]
 }
