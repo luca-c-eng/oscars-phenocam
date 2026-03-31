@@ -250,8 +250,8 @@ if [[ ! -f "${CONFIG_DIR}/settings.txt" ]]; then
 mysite
 +1
 Europe/Rome
-7
-19
+6
+22
 30
 eth0
 phenocam
@@ -329,6 +329,15 @@ for unit in \
   sudo cp "${SOFTWARE_DIR}/systemd/${unit}" "${SYSTEMD_DIR}/"
   log_ok "Installed: $unit"
 done
+
+# Install logrotate configuration
+if [[ -f "${SOFTWARE_DIR}/config/phenocam.logrotate" ]]; then
+  sudo cp "${SOFTWARE_DIR}/config/phenocam.logrotate" /etc/logrotate.d/phenocam
+  sudo chmod 644 /etc/logrotate.d/phenocam
+  log_ok "logrotate configuration installed: /etc/logrotate.d/phenocam"
+else
+  log_warn "phenocam.logrotate not found — log rotation not installed"
+fi
 
 # Install udev rule
 sudo cp "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules" "${UDEV_DIR}/"
