@@ -174,6 +174,7 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/systemd/phenocam-init.service"
   "${SOFTWARE_DIR}/systemd/phenocam-capture.timer"
   "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules"
+  "${SOFTWARE_DIR}/config/phenocam.logrotate"
 )
 
 for f in "${CRITICAL_FILES[@]}"; do
