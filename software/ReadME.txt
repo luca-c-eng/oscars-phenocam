@@ -28,7 +28,7 @@ software/
 │   └── upload_ftp.sh      → upload_pair_ftp(): sends jpg+meta via FTP + curl
 
 ├── config/     # configuration file examples
-│   ├── settings_example.txt       → example settings.txt (13 positional fields)
+│   ├── settings_example.txt       → example settings.txt (20 positional fields)
 │   ├── server_example.txt         → example server.txt for SFTP
 │   ├── ftp_credentials.txt        → placeholder (replace with real values on RPi)
 │   └── ftp_credentials_example.txt → annotated FTP credentials example
