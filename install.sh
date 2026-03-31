@@ -329,12 +329,12 @@ echo ""
 log_step "Installing systemd units and udev rules..."
 
 # Copy systemd units
-for unit in \
-  phenocam-capture.service phenocam-capture.timer \
-  phenocam-upload.service  phenocam-upload.timer \
-  phenocam-init.service    run-phenocam.mount; do
-  sudo cp "${SOFTWARE_DIR}/systemd/${unit}" "${SYSTEMD_DIR}/"
-  log_ok "Installed: $unit"
+for unit in "${SOFTWARE_DIR}/systemd/"*.service \
+            "${SOFTWARE_DIR}/systemd/"*.timer \
+            "${SOFTWARE_DIR}/systemd/"*.mount; do
+  [[ -f "$unit" ]] || continue
+  sudo cp "$unit" "${SYSTEMD_DIR}/"
+  log_ok "Installed: $(basename "$unit")"
 done
 
 # Install logrotate configuration
