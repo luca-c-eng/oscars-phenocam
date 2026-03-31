@@ -1,0 +1,9 @@
+/var/log/phenocam/phenocam.log {
+    size 1M
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 phenocam phenocam
+}
