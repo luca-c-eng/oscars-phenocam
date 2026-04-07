@@ -320,6 +320,14 @@ else
   log_ok "SSH key pair already exists — not regenerated"
 fi
 
+# Ensure the upload service user can read the SSH key pair
+sudo chown phenocam:phenocam \
+  "${CONFIG_DIR}/keys/phenocam_key" \
+  "${CONFIG_DIR}/keys/phenocam_key.pub"
+sudo chmod 600 "${CONFIG_DIR}/keys/phenocam_key"
+sudo chmod 644 "${CONFIG_DIR}/keys/phenocam_key.pub"
+log_ok "SSH key permissions aligned for user phenocam"
+
 log_ok "SSH public key (send to SFTP server administrator):"
 echo ""
 sudo cat "${CONFIG_DIR}/keys/phenocam_key.pub"
