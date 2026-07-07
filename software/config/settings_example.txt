@@ -66,3 +66,12 @@ nd
 
 # 20) SITE_NIMAGE — expected or known image count for analysis metadata
 nd
+
+# 21) BOARD — auto-detected by install.sh (rpi3b+ | rpizero2w | unknown)
+unknown
+
+# 22) CAMERA_MODEL — set manually (imx708 | imx708_noir)
+imx708
+
+# 23) CAPTURE_TIMEOUT — rpicam-still timeout in ms (default 30000, safe on all boards)
+30000
