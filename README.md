@@ -145,12 +145,12 @@ oscars-phenocam/
 - Active Ethernet connection
 - Any user with sudo privileges
 
-### Development installation (`dev/v1.3.0`)
+### Development installation (`dev/v1.4.0`)
 
 From the RPi terminal, run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.3.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.4.0/install.sh | bash
 ```
 
 This single command will:
