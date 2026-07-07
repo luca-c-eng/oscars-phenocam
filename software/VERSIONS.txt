@@ -2,9 +2,22 @@
 # Update this file after every verified installation.
 # DO NOT install on different versions without running the full test suite.
 
+# ─── SUPPORTED HARDWARE COMBINATIONS ─────────────────────────────────────────
+# The software supports the following board + camera combinations.
+# Set BOARD and CAMERA_MODEL accordingly in /etc/phenocam/settings.txt.
+# BOARD is auto-detected and written by install.sh.
+# CAMERA_MODEL must be set manually after installation.
+#
+#   BOARD=rpi3b+      CAMERA_MODEL=imx708       → RPi 3B+ + Camera Module 3
+#   BOARD=rpi3b+      CAMERA_MODEL=imx708_noir   → RPi 3B+ + Camera V3 NoIR
+#   BOARD=rpizero2w   CAMERA_MODEL=imx708       → RPi Zero 2W + Camera Module 3
+#   BOARD=rpizero2w   CAMERA_MODEL=imx708_noir   → RPi Zero 2W + Camera V3 NoIR
+
 # ─── HARDWARE ────────────────────────────────────────────────────────────────
-HARDWARE_BOARD        = Raspberry Pi 3B+
-HARDWARE_CAMERA       = Raspberry Pi Camera Module 3 (imx708)
+HARDWARE_BOARD_1      = Raspberry Pi 3B+
+HARDWARE_BOARD_2      = Raspberry Pi Zero 2W
+HARDWARE_CAMERA_1     = Raspberry Pi Camera Module 3 (imx708)
+HARDWARE_CAMERA_2     = Raspberry Pi Camera V3 NoIR (imx708_noir)
 HARDWARE_STORAGE      = MicroSD Industrial 8GB (class 10 or higher)
 
 # ─── OPERATING SYSTEM ────────────────────────────────────────────────────────
@@ -13,7 +26,8 @@ OS_VERSION_ID         = 13
 OS_CODENAME           = trixie
 OS_VARIANT            = Raspberry Pi OS 64-bit Lite
 OS_RELEASE_DATE       = 2025-12-04
-KERNEL                = 6.12.75+rpt-rpi-v8 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1 (2026-03-11)
+KERNEL_RPI3B+         = 6.12.75+rpt-rpi-v8 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1 (2026-03-11)
+KERNEL_RPIZERO2W      = (to be filled after first verified installation)
 ARCH                  = aarch64
 
 # ─── INSTALLATION TOOLS (used on PC, not on RPi) ─────────────────────────────
@@ -21,7 +35,7 @@ IMAGER_NAME           = Raspberry Pi Imager
 IMAGER_VERSION        = v2.0.6
 OS_IMAGE_SOURCE       = Raspberry Pi OS (Other) → Raspberry Pi OS Lite (64-bit)
 OS_IMAGE_DESCRIPTION  = A port of Debian Trixie with no desktop environment
-                        (Compatible with Raspberry Pi 3/4/400/5)
+                        (Compatible with Raspberry Pi 3/4/400/5/Zero 2W)
 
 # ─── SOFTWARE DEPENDENCIES ───────────────────────────────────────────────────
 RPICAM_APPS           = v1.10.1 (2025-11-28)
@@ -34,12 +48,16 @@ BASH                  = present at /usr/bin/bash
 RUNUSER               = present at /usr/sbin/runuser
 
 # ─── PHENOCAM SOFTWARE ───────────────────────────────────────────────────────
-PHENOCAM_VERSION      = 1.3.0
+PHENOCAM_VERSION      = 1.4.0
 PHENOCAM_INSTALL      = /usr/local/lib/phenocam/
 PHENOCAM_CONFIG       = /etc/phenocam/
 PHENOCAM_LOG          = /var/log/phenocam/phenocam.log
-PHENOCAM_RAMDISK      = /run/phenocam/ (tmpfs 200MB)
+PHENOCAM_RAMDISK      = /run/phenocam/ (20% of total RAM, min 50MB)
+                        RPi 3B+ (1024 MB RAM)  → ~204 MB
+                        RPi Zero 2W (512 MB RAM) → ~102 MB
 
 # ─── NOTES ───────────────────────────────────────────────────────────────────
-# Tested and verified on: Phenocam01, Phenocam02, Phenocam03, Phenocam04
-# Last verified: 2026-03-19
+# Tested and verified on: Phenocam01 (rpi3b+/imx708), Phenocam02 (rpi3b+/imx708),
+#                         Phenocam03 (rpi3b+/imx708), Phenocam04 (rpi3b+/imx708)
+# RPi Zero 2W combinations: pending first verified installation
+# Last updated: 2026-07-07
