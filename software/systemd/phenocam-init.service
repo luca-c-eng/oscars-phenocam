@@ -1,15 +1,36 @@
 [Unit]
 Description=PhenoCam RAMDISK init
-After=run-phenocam.mount network-online.target
-Requires=run-phenocam.mount
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/mkdir -p /run/phenocam/queue /run/phenocam/staging
-ExecStart=/bin/chown -R phenocam:phenocam /run/phenocam
-ExecStart=/usr/sbin/runuser -u phenocam -- /usr/local/lib/phenocam/bin/phenocam-run.sh
 RemainAfterExit=yes
+
+# ── 1. Calculate RAMDISK size at 20% of total RAM, minimum 50 MB ─────────────
+# This approach makes the mount size portable across boards:
+#   RPi 3B+ (1024 MB RAM) → ~204 MB
+#   RPi Zero 2W (512 MB RAM) → ~102 MB
+# The result is written to the mount unit options and the unit is restarted.
+ExecStart=/bin/bash -c '\
+  TOTAL_MB=$(awk "/MemTotal/{printf \"%d\", \$2/1024}" /proc/meminfo); \
+  RAM_PCT=$((TOTAL_MB * 20 / 100)); \
+  RAM_SIZE=$([[ $RAM_PCT -lt 50 ]] && echo 50 || echo $RAM_PCT); \
+  MOUNT_FILE=/etc/systemd/system/run-phenocam.mount; \
+  sed -i "s/size=[0-9]*m/size=${RAM_SIZE}m/" "$MOUNT_FILE"; \
+  systemctl daemon-reload'
+
+# ── 2. Start (or restart) the RAMDISK mount with the updated size ─────────────
+ExecStart=/bin/systemctl restart run-phenocam.mount
+
+# ── 3. Create queue and staging directories ───────────────────────────────────
+ExecStart=/bin/mkdir -p /run/phenocam/queue /run/phenocam/staging
+
+# ── 4. Assign ownership to phenocam user ─────────────────────────────────────
+ExecStart=/bin/chown -R phenocam:phenocam /run/phenocam
+
+# ── 5. Run first capture + upload cycle as health check (as phenocam user) ───
+ExecStart=/usr/sbin/runuser -u phenocam -- /usr/local/lib/phenocam/bin/phenocam-run.sh
 
 [Install]
 WantedBy=multi-user.target
