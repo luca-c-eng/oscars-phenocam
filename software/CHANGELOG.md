@@ -5,6 +5,62 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ---
 
+## [1.4.0] — 2026-07-07
+
+### Added
+- Multi-hardware support via `settings.txt` configuration (no separate branches):
+  - `BOARD` (field 21): `rpi3b+` | `rpizero2w` | `unknown`
+    Auto-detected from `/proc/cpuinfo` by `install.sh` at install time.
+  - `CAMERA_MODEL` (field 22): `imx708` (Camera Module 3) | `imx708_noir` (V3 NoIR)
+    Set manually after installation.
+  - `CAPTURE_TIMEOUT` (field 23): rpicam-still timeout in ms (default 30000).
+    Same value is safe on both boards; has no effect on image quality.
+
+- `capture_vis.sh`: added `--timeout` flag using `CAPTURE_TIMEOUT` variable.
+  Prevents the ISP from being cut off on slower boards (Zero 2W) before
+  exposure and white balance have stabilised.
+
+- Dynamic RAMDISK sizing in `phenocam-init.service`:
+  - Calculates 20% of total RAM at boot, with a minimum of 50 MB.
+  - Writes the result into `run-phenocam.mount` before (re)starting the mount.
+  - RPi 3B+ (1024 MB): ~204 MB RAMDISK
+  - RPi Zero 2W (512 MB): ~102 MB RAMDISK
+  - Replaces the previous hardcoded 200 MB value.
+
+- `install.sh`: auto-detects board model from `/proc/cpuinfo` and writes
+  the `BOARD` field into `settings.txt` (line 21) automatically.
+
+### Changed
+- `config_read.sh`: added fields 21 (`BOARD`), 22 (`CAMERA_MODEL`),
+  23 (`CAPTURE_TIMEOUT`).
+- `VERSIONS.txt`: documents all four supported hardware combinations
+  (2 boards × 2 cameras). RPi Zero 2W kernel to be filled after first
+  verified installation.
+
+---
+
+## [1.3.0] — 2026-04-01
+
+### Added
+- Site metadata fields in `settings.txt` (fields 15–20):
+  `SITE_LAT`, `SITE_LON`, `SITE_ELEV_M`, `SITE_START_DATE`,
+  `SITE_END_DATE`, `SITE_NIMAGE` — all default to `nd` (not defined).
+- `REMOTE_LAYOUT` field (field 14): `general` | `icos` — selects the
+  remote directory structure for upload (PhenoCam general network or
+  ICOS Europe network).
+- `logrotate` configuration: `config/phenocam.logrotate` — weekly rotation,
+  4 weeks history, compression, copytruncate (no service restart required).
+  Installed to `/etc/logrotate.d/phenocam` by `install.sh`.
+- `install.sh`: installs logrotate configuration automatically.
+- SSH key permissions aligned for phenocam user (600 private, 644 public).
+- SFTP setup instructions added to the final report in `install.sh`.
+
+### Changed
+- `settings.txt` expanded from 13 to 20 fields (backward compatible —
+  missing fields default gracefully).
+
+---
+
 ## [1.2.2] — 2026-03-19
 
 ### Bugfix
@@ -69,8 +125,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [1.0.0] — 2026-03-18
 
-First stable release. Tested and verified on Phenocam01, Phenocam02,
-Phenocam03.
+First stable release. Tested and verified on Phenocam01, Phenocam02, Phenocam03.
 
 ### Features
 - Periodic image acquisition with rpicam-still (Camera Module 3)
@@ -84,17 +139,6 @@ Phenocam03.
   MemoryDenyWriteExecute)
 - Diagnostic scripts: diag_camera.sh, diag_net.sh, diag_ramdisk.sh,
   diag_upload.sh
-
-### Components
-- `bin/`: phenocam-capture.sh, phenocam-upload.sh, phenocam-run.sh,
-  diag_*.sh, phenocam-usb-attach.sh, phenocam-usb-detach.sh
-- `scripts/`: common.sh, cycle.sh, config_read.sh, capture_vis.sh,
-  meta_build.sh, net_check.sh, storage_manager.sh, queue_manager.sh,
-  upload_sftp.sh, upload_ftp.sh, uploader_daemon.sh
-- `systemd/`: phenocam-capture.service/.timer, phenocam-upload.service/.timer,
-  phenocam-init.service, run-phenocam.mount, 99-phenocam-usb.rules
-- `config/`: settings_example.txt, server_example.txt,
-  ftp_credentials.txt (placeholder), ftp_credentials_example.txt
 
 ### Bugs fixed (compared to development versions)
 - Windows CRLF in scripts caused "invalid option name: pipefail"
@@ -112,10 +156,3 @@ Phenocam03.
 - Orphan files in staging were never removed — added automatic cleanup
 
 ---
-
-## [Unreleased]
-
-### TODO (eventually - to evaluate)
-- PhenoCam Network directory structure compatibility (sitename/YYYY/MM/)
-- Clarify .meta format requirements with PhenoCam Network
-- Manual stop/start commands (phenocam-stop, phenocam-start)
