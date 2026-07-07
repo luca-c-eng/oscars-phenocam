@@ -28,7 +28,7 @@ IFS=$'\n\t'
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/luca-c-eng/oscars-phenocam.git"
-REPO_BRANCH="dev/v1.3.0"
+REPO_BRANCH="dev/v1.4.0"
 INSTALL_DIR="/opt/oscars-phenocam"
 SOFTWARE_DIR="${INSTALL_DIR}/software"
 LIB_DIR="/usr/local/lib/phenocam"
@@ -204,6 +204,20 @@ else
   log_warn "After reboot, run: vcgencmd get_camera  (expected: supported=1 detected=1)"
 fi
 
+# ── Step 5b — Detect hardware board ─────────────────────────────────────────
+log_step "Detecting hardware board..."
+
+BOARD_RAW="$(grep -i "Model" /proc/cpuinfo | tail -1 || true)"
+if echo "$BOARD_RAW" | grep -qi "Zero 2"; then
+  DETECTED_BOARD="rpizero2w"
+elif echo "$BOARD_RAW" | grep -qi "3 Model B Plus\|3B+"; then
+  DETECTED_BOARD="rpi3b+"
+else
+  DETECTED_BOARD="unknown"
+  log_warn "Board not recognised: $BOARD_RAW — writing 'unknown' to settings.txt"
+fi
+log_ok "Board detected: $DETECTED_BOARD ($BOARD_RAW)"
+
 # ── Step 6 — Deploy software ──────────────────────────────────────────────────
 log_step "Deploying software..."
 
@@ -274,9 +288,15 @@ nd
 nd
 nd
 nd
+unknown
+imx708
+30000
 SETTINGS
   log_ok "settings.txt created (edit to set your SITENAME and parameters)"
   log_warn "ACTION REQUIRED: sudo nano ${CONFIG_DIR}/settings.txt — set SITENAME (line 1)"
+  # Write auto-detected board into settings.txt (line 21)
+  sudo sed -i "21s/.*/\${DETECTED_BOARD:-unknown}/" "${CONFIG_DIR}/settings.txt"
+  log_ok "Board written to settings.txt: ${DETECTED_BOARD:-unknown}"
 else
   log_ok "settings.txt already exists — not overwritten"
 fi
