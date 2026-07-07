@@ -33,20 +33,30 @@ read_settings() {
   USB_MAX_USED_PCT="${L[12]:-90}"          # USB usage threshold (%); spills to SD if exceeded
   REMOTE_LAYOUT="${L[13]:-general}"        # general | icos
 
-  SITE_LAT="${L[14]:-nd}"                  # decimal degrees
-  SITE_LON="${L[15]:-nd}"                  # decimal degrees
-  SITE_ELEV_M="${L[16]:-nd}"               # meters above sea level
+  SITE_LAT="${L[14]:-nd}"                  # decimal degrees, e.g. 41.902782
+  SITE_LON="${L[15]:-nd}"                  # decimal degrees, e.g. 12.496366
+  SITE_ELEV_M="${L[16]:-nd}"               # metres above sea level, integer
   SITE_START_DATE="${L[17]:-nd}"           # YYYY-MM-DD
-  SITE_END_DATE="${L[18]:-nd}"             # YYYY-MM-DD
-  SITE_NIMAGE="${L[19]:-nd}"               # image count or nd  
+  SITE_END_DATE="${L[18]:-nd}"             # YYYY-MM-DD or nd if ongoing
+  SITE_NIMAGE="${L[19]:-nd}"               # image count or nd
+
+  # v1.4.0 — hardware configuration fields
+  BOARD="${L[20]:-unknown}"                # rpi3b+ | rpizero2w | unknown
+                                           # auto-detected and written by install.sh
+  CAMERA_MODEL="${L[21]:-imx708}"          # imx708 (Camera Module 3) | imx708_noir (V3 NoIR)
+
+  # Capture timeout: derived from BOARD if not explicitly set.
+  # Zero 2W is slower — 30 s is safe on both boards and has no quality impact.
+  CAPTURE_TIMEOUT="${L[22]:-30000}"        # ms; default 30000 works on all supported boards
 
   export SITENAME UTC_OFFSET TZ_LABEL START_HOUR END_HOUR INTERVAL_MIN
   export IFACE SFTP_USER NET_MODE RAM_MIN_FREE_MB SD_MAX_USED_PCT
   export USB_MOUNT_BASES USB_MAX_USED_PCT REMOTE_LAYOUT
   export SITE_LAT SITE_LON SITE_ELEV_M SITE_START_DATE SITE_END_DATE SITE_NIMAGE
+  export BOARD CAMERA_MODEL CAPTURE_TIMEOUT
 }
 
-# within_window
+# within_window — returns 0 if current hour is within [START_HOUR, END_HOUR).
 within_window() {
   local h_now start_h end_h
   h_now=$((10#$(date +%H)))
