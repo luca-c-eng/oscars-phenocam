@@ -1,77 +1,49 @@
-# settings.txt (positional format)
-# One value per line. Empty lines and comments (#) are ignored.
-# Fields are read by position — do not change the order.
+# settings.txt — PhenoCam v1.4.0 positional configuration
+# Comments and blank lines are ignored. Keep every real field as one non-empty line.
 
-# 1) SITENAME — unique identifier for this PhenoCam station
-mysite_phenocam01
-
-# 2) UTC_OFFSET — UTC offset (e.g. +1, +2, 0, -5)
-+1
-
-# 3) TZ_LABEL — full timezone name (e.g. Europe/Rome, America/New_York)
+# 1 SITENAME
+phenozero
+# 2 UTC_OFFSET
++2
+# 3 TZ_LABEL
 Europe/Rome
-
-# 4) START_HOUR — first hour of the day to capture images (0-23)
+# 4 START_HOUR
 6
-
-# 5) END_HOUR — last hour of the day to capture images (0-23)
+# 5 END_HOUR — exclusive
 22
-
-# 6) INTERVAL_MIN — interval between captures in minutes
+# 6 INTERVAL_MIN
 30
-
-# 7) IFACE — network interface for IP/MAC in metadata (optional)
-#    Leave empty for auto-detect.
-#    RPi 3B+ typical values: eth0 (Ethernet), wlan0 (WiFi), usb0 (OTG Ethernet)
-eth0
-
-# 8) SFTP_USER — SFTP username on the remote server
+# 7 IFACE — wlan0 for Zero 2 W Wi-Fi, eth0 for Ethernet
+wlan0
+# 8 SFTP_USER — only used if server.txt enables SFTP
 phenocam
-
-# 9) NET_MODE — network mode: auto | ethernet | wifi
-auto
-
-# 10) RAM_MIN_FREE_MB — RAMDISK free space threshold before spillover to USB/SD
+# 9 NET_MODE — auto | ethernet | wifi
+wifi
+# 10 RAM_MIN_FREE_MB
 20
-
-# 11) SD_MAX_USED_PCT — SD card usage threshold; captures stop if exceeded
+# 11 SD_MAX_USED_PCT
 80
-
-# 12) USB_MOUNT_BASES — colon-separated base paths to scan for mounted USB drives
+# 12 USB_MOUNT_BASES
 /media:/mnt
-
-# 13) USB_MAX_USED_PCT — USB usage threshold; spills over to SD if exceeded
-#     Higher than SD (default 90) because USB is removable and replaceable.
+# 13 USB_MAX_USED_PCT
 90
-
-# 14) REMOTE_LAYOUT — remote directory layout: general | icos
-#     general -> <sitename>/<YYYY>/<MM>/
-#     icos    -> data/<sitename>/
+# 14 REMOTE_LAYOUT — general | icos
 general
-
-# 15) SITE_LAT — site latitude in decimal degrees (use negative for South)
+# 15 SITE_LAT
 nd
-
-# 16) SITE_LON — site longitude in decimal degrees (use negative for West)
+# 16 SITE_LON
 nd
-
-# 17) SITE_ELEV_M — site elevation above sea level in meters
+# 17 SITE_ELEV_M
 nd
-
-# 18) SITE_START_DATE — site start date in YYYY-MM-DD format
+# 18 SITE_START_DATE
 nd
-
-# 19) SITE_END_DATE — site end date in YYYY-MM-DD format
+# 19 SITE_END_DATE
 nd
-
-# 20) SITE_NIMAGE — expected or known image count for analysis metadata
+# 20 SITE_NIMAGE
 nd
-
-# 21) BOARD — auto-detected by install.sh (rpi3b+ | rpizero2w | unknown)
-unknown
-
-# 22) CAMERA_MODEL — set manually (imx708 | imx708_noir)
+# 21 BOARD — rpi3b+ | rpizero2w | unknown
+rpizero2w
+# 22 CAMERA_MODEL — imx708 | imx708_noir
 imx708
-
-# 23) CAPTURE_TIMEOUT — rpicam-still timeout in ms (default 30000, safe on all boards)
+# 23 CAPTURE_TIMEOUT — ms, rpicam warm-up time
 30000
