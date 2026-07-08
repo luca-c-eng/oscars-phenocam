@@ -1,11 +1,13 @@
 [Unit]
 Description=PhenoCam capture cycle (VIS)
-After=run-phenocam.mount
+After=phenocam-init.service run-phenocam.mount
+Requires=phenocam-init.service run-phenocam.mount
 
 [Service]
 Type=oneshot
 User=phenocam
 Group=phenocam
+TimeoutStartSec=300
 ExecStart=/usr/local/lib/phenocam/bin/phenocam-capture.sh
 
 NoNewPrivileges=yes
