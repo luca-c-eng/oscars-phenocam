@@ -85,13 +85,11 @@ Example, if the provider exposes FTP on port 22:
 
 ```text
 5.249.152.25
-22
+21
 /phenocams/data
 myuser
 mypassword
 ```
-
-Port `22` does not automatically mean SFTP. If the provider says the protocol is FTP, keep using `ftp://` through `ftp_credentials.txt`.
 
 ### SFTP
 
