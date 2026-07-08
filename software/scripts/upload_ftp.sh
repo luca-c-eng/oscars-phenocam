@@ -11,28 +11,21 @@ IFS=$'\n\t'
 #
 # ftp_credentials.txt format (positional, one value per line):
 #   1) FTP_HOST        e.g. 192.168.1.100
-#   2) FTP_PORT        e.g. 21
+#   2) FTP_PORT        e.g. 21, or any provider-defined FTP port such as 22
 #   3) FTP_REMOTE_BASE e.g. /phenocams/data
 #   4) FTP_USER        e.g. myuser
 #   5) FTP_PASS        e.g. mypassword
 #
-# Remote path structure (created automatically under FTP_REMOTE_BASE):
-#   general -> FTP_REMOTE_BASE / <sitename> / <YYYY> / <MM> / filename
-#   icos    -> FTP_REMOTE_BASE / data / <sitename> / filename
-#
-# Requirements:
-#   - curl available in PATH
-#   - FTP server must support passive mode (PASV)
-#   - FTP_REMOTE_BASE directory must already exist on the server
-#   - SITENAME must be exported in the environment (set by config_read.sh)
-#   - REMOTE_LAYOUT must be exported in the environment (set by config_read.sh)
+# Important: FTP_PORT is configuration, not protocol detection. If the provider
+# exposes FTP on port 22, the URL remains ftp://HOST:22/... . Do not convert it
+# to SFTP unless the SFTP configuration is explicitly enabled via server.txt.
 
 read_ftp_credentials() {
   local f="$1"
   [[ -f "$f" ]] || return 1
 
-  # Read non-empty, non-comment lines only.
-  mapfile -t L < <(grep -vE '^\s*#' "$f" | sed '/^\s*$/d')
+  # Read non-empty, non-comment lines only. Strip CR to tolerate CRLF edits.
+  mapfile -t L < <(grep -vE '^\s*#' "$f" | sed -e 's/\r$//' -e '/^\s*$/d')
 
   # Minimum 5 required fields.
   [[ "${#L[@]}" -ge 5 ]] || return 2
@@ -43,7 +36,25 @@ read_ftp_credentials() {
   FTP_USER="${L[3]}"
   FTP_PASS="${L[4]}"
 
+  [[ "$FTP_PORT" =~ ^[0-9]+$ ]] || return 3
+
   export FTP_HOST FTP_PORT FTP_REMOTE_BASE FTP_USER FTP_PASS
+}
+
+upload_one_ftp() {
+  local local_file="$1"
+  local remote_url="$2"
+
+  curl --silent --show-error \
+       --ftp-pasv \
+       --ftp-create-dirs \
+       --connect-timeout "${FTP_CONNECT_TIMEOUT:-30}" \
+       --max-time "${FTP_MAX_TIME:-300}" \
+       --retry "${FTP_RETRY:-2}" \
+       --retry-delay "${FTP_RETRY_DELAY:-3}" \
+       --user "${FTP_USER}:${FTP_PASS}" \
+       -T "$local_file" \
+       "$remote_url"
 }
 
 upload_pair_ftp() {
@@ -94,32 +105,19 @@ upload_pair_ftp() {
       ;;
   esac
 
-  # Create remote subdirectory (--ftp-create-dirs handles this automatically)
-  # The .keep upload may fail on some servers but --ftp-create-dirs is also
-  # applied to the actual file uploads below.
+  # Create remote subdirectory. This .keep upload may fail on some servers;
+  # actual JPG/META uploads below also use --ftp-create-dirs.
   curl --silent --show-error \
+       --ftp-pasv \
        --ftp-create-dirs \
+       --connect-timeout "${FTP_CONNECT_TIMEOUT:-30}" \
+       --max-time "${FTP_MAX_TIME:-120}" \
        --user "${FTP_USER}:${FTP_PASS}" \
        -T /dev/null \
        "${ftp_base}${remote_dir}/.keep" 2>/dev/null || true
 
-  # Upload .jpg
-  if ! curl --silent --show-error \
-            --ftp-create-dirs \
-            --user "${FTP_USER}:${FTP_PASS}" \
-            -T "$jpg" \
-            "${ftp_base}${remote_dir}/$(basename "$jpg")"; then
-    return 20
-  fi
-
-  # Upload .meta
-  if ! curl --silent --show-error \
-            --ftp-create-dirs \
-            --user "${FTP_USER}:${FTP_PASS}" \
-            -T "$meta" \
-            "${ftp_base}${remote_dir}/$(basename "$meta")"; then
-    return 21
-  fi
+  upload_one_ftp "$jpg"  "${ftp_base}${remote_dir}/$(basename "$jpg")"  || return 20
+  upload_one_ftp "$meta" "${ftp_base}${remote_dir}/$(basename "$meta")" || return 21
 
   return 0
 }
