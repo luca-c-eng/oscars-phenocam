@@ -40,7 +40,7 @@ software/
 ## Clean install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.4.0/software/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.4.0/install.sh | bash
 ```
 
 The installer prepares the runtime RAMDISK, deploys services, creates configuration files, and keeps production timers disabled until the station is configured.
