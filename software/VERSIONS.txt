@@ -27,7 +27,7 @@ OS_CODENAME           = trixie
 OS_VARIANT            = Raspberry Pi OS 64-bit Lite
 OS_RELEASE_DATE       = 2025-12-04
 KERNEL_RPI3B+         = 6.12.75+rpt-rpi-v8 #1 SMP PREEMPT Debian 1:6.12.75-1+rpt1 (2026-03-11)
-KERNEL_RPIZERO2W      = (to be filled after first verified installation)
+KERNEL_RPIZERO2W      = (verified on phenozero1; exact kernel not captured in validation log)
 ARCH                  = aarch64
 
 # ─── INSTALLATION TOOLS (used on PC, not on RPi) ─────────────────────────────
@@ -59,5 +59,5 @@ PHENOCAM_RAMDISK      = /run/phenocam/ (20% of total RAM, min 50MB)
 # ─── NOTES ───────────────────────────────────────────────────────────────────
 # Tested and verified on: Phenocam01 (rpi3b+/imx708), Phenocam02 (rpi3b+/imx708),
 #                         Phenocam03 (rpi3b+/imx708), Phenocam04 (rpi3b+/imx708)
-# RPi Zero 2W combinations: pending first verified installation
-# Last updated: 2026-07-07
+# RPi Zero 2W + imx708: operationally verified on phenozero1, 2026-07-08
+# Last updated: 2026-07-08
