@@ -7,23 +7,30 @@ IFS=$'\n\t'
 # =============================================================================
 # Usage (run as any user with sudo privileges):
 #
-#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.4.0/install.sh | bash
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.4.0/install.sh | bash
+#
+# Optional:
+#
+#  PHENOCAM_DISABLE_TIMERS=1 curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.4.0/install.sh | bash
 #
 # What this script does:
 #   1. Checks prerequisites (OS, hardware, network)
-#   2. Installs system dependencies (git, exiftool) at pinned versions
-#   3. Clones the repository from GitHub
-#   4. Verifies all expected files are present
-#   5. Enables the camera in raspi-config (non-interactive)
+#   2. Installs system dependencies (git, exiftool)
+#   3. Clones or updates the repository from GitHub
+#   4. Verifies all expected critical files are present
+#   5. Enables the camera interface if needed
 #   6. Deploys the software to system directories
-#   7. Creates configuration file templates
-#   8. Installs and enables systemd units and udev rules
-#   9. Runs a first capture+upload cycle as system health check
-#  10. Reports installation status
+#   7. Creates configuration file templates without overwriting existing config
+#   8. Installs systemd units, logrotate config and udev rules
+#   9. Prepares RAMDISK and enables production timers for boot
+#  10. Reports installation status and next actions
 #
 # After installation, configure:
-#   sudo nano /etc/phenocam/settings.txt        (adjust SITENAME, hours, etc.)
-#   sudo nano /etc/phenocam/ftp_credentials.txt (FTP server credentials)
+#   sudo nano /etc/phenocam/settings.txt
+#   sudo nano /etc/phenocam/ftp_credentials.txt
+#
+# Normal flow:
+#   install -> configure -> reboot -> timers start automatically at boot
 # =============================================================================
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -62,7 +69,7 @@ log_step "Checking prerequisites..."
 # Must not run as root
 [[ "$EUID" -ne 0 ]] || log_fatal "Do not run this script as root. Run as a regular user with sudo privileges."
 
-# Must have sudo
+# Must have sudo; this may ask for the password once.
 sudo -v || log_fatal "This script requires sudo privileges."
 
 # Check OS
@@ -93,7 +100,7 @@ log_step "Installing system dependencies..."
 
 sudo apt-get update -qq
 
-# Install git (not pre-installed on RPi OS Lite)
+# Install git
 if ! command -v git >/dev/null 2>&1; then
   sudo apt-get install -y git
   log_ok "git installed"
@@ -101,7 +108,7 @@ else
   log_ok "git already present: $(git --version)"
 fi
 
-# Install exiftool at pinned version
+# Install exiftool at pinned version where available.
 INSTALLED_EXIFTOOL="$(dpkg-query -W -f='${Version}' libimage-exiftool-perl 2>/dev/null || true)"
 if [[ "$INSTALLED_EXIFTOOL" == "$EXIFTOOL_VERSION" ]]; then
   log_ok "exiftool already at pinned version: $EXIFTOOL_VERSION"
@@ -110,46 +117,53 @@ else
     log_warn "Pinned version $EXIFTOOL_VERSION not available. Installing latest available..."
     sudo apt-get install -y libimage-exiftool-perl
   }
+
   INSTALLED_EXIFTOOL="$(dpkg-query -W -f='${Version}' libimage-exiftool-perl 2>/dev/null || true)"
   log_ok "exiftool installed: $INSTALLED_EXIFTOOL"
+
   if [[ "$INSTALLED_EXIFTOOL" != "$EXIFTOOL_VERSION" ]]; then
     log_warn "Installed version ($INSTALLED_EXIFTOOL) differs from pinned ($EXIFTOOL_VERSION)."
     log_warn "Software will likely work, but report this for future VERSIONS.txt update."
   fi
 fi
 
-# Freeze exiftool version (prevent apt upgrade from changing it)
-sudo apt-mark hold libimage-exiftool-perl >/dev/null
-log_ok "exiftool version frozen (apt-mark hold)"
+# Freeze exiftool version if installed.
+if dpkg-query -W libimage-exiftool-perl >/dev/null 2>&1; then
+  sudo apt-mark hold libimage-exiftool-perl >/dev/null
+  log_ok "exiftool version frozen (apt-mark hold)"
+fi
 
-# Verify other required tools
+# Verify other required tools.
 for tool in rpicam-still curl sftp flock; do
   if command -v "$tool" >/dev/null 2>&1; then
-    log_ok "$tool: $(which "$tool")"
+    log_ok "$tool: $(command -v "$tool")"
   else
     log_fatal "$tool not found. Is this Raspberry Pi OS Lite (64-bit)?"
   fi
 done
 
-# Verify runuser path
+# Verify runuser path.
 if [[ -x /usr/sbin/runuser ]]; then
   log_ok "runuser: /usr/sbin/runuser"
 else
   log_fatal "runuser not found at /usr/sbin/runuser."
 fi
 
-# ── Step 3 — Clone repository ─────────────────────────────────────────────────
-log_step "Cloning repository..."
+# ── Step 3 — Clone or update repository ───────────────────────────────────────
+log_step "Cloning/updating repository..."
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
-  log_warn "Repository already exists at $INSTALL_DIR. Pulling latest changes..."
-  sudo git -C "$INSTALL_DIR" pull --ff-only
+  log_warn "Repository already exists at $INSTALL_DIR. Updating branch ${REPO_BRANCH}..."
+  sudo git -C "$INSTALL_DIR" fetch origin "$REPO_BRANCH"
+  sudo git -C "$INSTALL_DIR" checkout "$REPO_BRANCH"
+  sudo git -C "$INSTALL_DIR" pull --ff-only origin "$REPO_BRANCH"
 else
-   sudo git clone --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  sudo git clone --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
-log_ok "Repository cloned to: $INSTALL_DIR"
 
-# ── Step 4 — Verify file count ────────────────────────────────────────────────
+log_ok "Repository ready at: $INSTALL_DIR"
+
+# ── Step 4 — Verify downloaded files ─────────────────────────────────────────
 log_step "Verifying downloaded files..."
 
 ACTUAL_COUNT="$(find "$INSTALL_DIR" -type f | wc -l)"
@@ -159,7 +173,7 @@ else
   log_fatal "File count mismatch: found $ACTUAL_COUNT, expected $EXPECTED_FILE_COUNT. Clone may be incomplete."
 fi
 
-# Verify critical files exist
+# Verify critical files exist.
 CRITICAL_FILES=(
   "${SOFTWARE_DIR}/bin/phenocam-capture.sh"
   "${SOFTWARE_DIR}/bin/phenocam-upload.sh"
@@ -184,8 +198,8 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/systemd/phenocam-upload.service"
   "${SOFTWARE_DIR}/systemd/run-phenocam.mount"
   "${SOFTWARE_DIR}/systemd/phenocam-capture.timer"
-  "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules"
   "${SOFTWARE_DIR}/systemd/phenocam-upload.timer"
+  "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules"
 )
 
 for f in "${CRITICAL_FILES[@]}"; do
@@ -199,17 +213,19 @@ done
 # ── Step 5 — Enable camera ────────────────────────────────────────────────────
 log_step "Enabling camera interface..."
 
-# Check if camera is already detected
+# vcgencmd get_camera is kept as a lightweight compatibility check.
+# On newer Raspberry Pi OS releases, diag_camera.sh/rpicam-hello are more useful
+# after reboot.
 if vcgencmd get_camera 2>/dev/null | grep -q "detected=1"; then
-  log_ok "Camera already enabled and detected"
+  log_ok "Camera currently detected"
 else
-  # Enable camera via raspi-config non-interactive
   sudo raspi-config nonint do_camera 0 2>/dev/null || true
-  log_warn "Camera enabled in raspi-config. A reboot will be required after installation."
-  log_warn "After reboot, run: vcgencmd get_camera  (expected: supported=1 detected=1)"
+  log_warn "Camera was requested/enabled via raspi-config where supported."
+  log_warn "A reboot may be required before the camera is detected."
+  log_warn "After reboot, run: sudo /usr/local/lib/phenocam/bin/diag_camera.sh"
 fi
 
-# ── Step 5b — Detect hardware board ─────────────────────────────────────────
+# ── Step 5b — Detect hardware board ───────────────────────────────────────────
 log_step "Detecting hardware board..."
 
 BOARD_RAW="$(grep -i "Model" /proc/cpuinfo | tail -1 || true)"
@@ -221,12 +237,13 @@ else
   DETECTED_BOARD="unknown"
   log_warn "Board not recognised: $BOARD_RAW — writing 'unknown' to settings.txt"
 fi
+
 log_ok "Board detected: $DETECTED_BOARD ($BOARD_RAW)"
 
 # ── Step 6 — Deploy software ──────────────────────────────────────────────────
 log_step "Deploying software..."
 
-# Create system user
+# Create system user.
 if id phenocam >/dev/null 2>&1; then
   log_ok "User phenocam already exists"
 else
@@ -234,11 +251,11 @@ else
   log_ok "User phenocam created (uid=$(id -u phenocam))"
 fi
 
-# Add phenocam to video group
+# Add phenocam to video group.
 sudo usermod -aG video phenocam
 log_ok "phenocam added to video group"
 
-# Create directory structure
+# Create directory structure.
 sudo mkdir -p \
   "${LIB_DIR}/bin" \
   "${LIB_DIR}/scripts" \
@@ -246,44 +263,52 @@ sudo mkdir -p \
   "${CONFIG_DIR}/keys" \
   "${LOG_DIR}" \
   "/var/lib/phenocam/queue"
+
 log_ok "Directory structure created"
 
-# Set config directory group BEFORE creating config files
+# Set config directory group before creating config files.
 sudo chown -R root:phenocam "${CONFIG_DIR}"
 log_ok "Config directory group set to phenocam"
 
-# Copy scripts
+# Copy scripts.
 sudo cp "${SOFTWARE_DIR}/scripts/"*.sh "${LIB_DIR}/scripts/"
 sudo cp "${SOFTWARE_DIR}/bin/"*.sh     "${LIB_DIR}/bin/"
 sudo chmod +x "${LIB_DIR}/bin/"*.sh "${LIB_DIR}/scripts/"*.sh
 log_ok "Scripts deployed and made executable ($(find "${LIB_DIR}" -name "*.sh" | wc -l) files)"
 
-# Copy local documentation if present
+# Copy local documentation if present.
 if [[ -d "${SOFTWARE_DIR}/docs" ]]; then
   sudo cp -r "${SOFTWARE_DIR}/docs/." "${LIB_DIR}/docs/"
 fi
-for doc in README.md ReadME.txt CHANGELOG.md VERSIONS.txt; do
+
+for doc in README.md ReadME.txt CHANGELOG.md VERSIONS.txt VERSION; do
   [[ -f "${SOFTWARE_DIR}/${doc}" ]] && sudo cp "${SOFTWARE_DIR}/${doc}" "${LIB_DIR}/docs/"
 done
+
 sudo chmod -R a+rX "${LIB_DIR}/docs"
 log_ok "Documentation deployed to ${LIB_DIR}/docs"
 
-# Set permissions
+# Set permissions.
 sudo chmod 750 \
   "${CONFIG_DIR}" \
   "${CONFIG_DIR}/keys" \
   "${LOG_DIR}" \
   "/var/lib/phenocam" \
   "/var/lib/phenocam/queue"
-sudo chown phenocam:phenocam "${LOG_DIR}" "/var/lib/phenocam" "/var/lib/phenocam/queue"
+
+sudo chown phenocam:phenocam \
+  "${LOG_DIR}" \
+  "/var/lib/phenocam" \
+  "/var/lib/phenocam/queue"
+
 log_ok "Permissions set"
 
 # ── Step 7 — Create configuration templates ───────────────────────────────────
 log_step "Creating configuration files..."
 
-# settings.txt — create only if not already present
+# settings.txt — create only if not already present.
 if [[ ! -f "${CONFIG_DIR}/settings.txt" ]]; then
-  sudo tee "${CONFIG_DIR}/settings.txt" > /dev/null << 'SETTINGS'
+  sudo tee "${CONFIG_DIR}/settings.txt" >/dev/null <<'SETTINGS'
 mysite
 +1
 Europe/Rome
@@ -308,10 +333,13 @@ unknown
 imx708
 30000
 SETTINGS
+
   log_ok "settings.txt created (edit to set your SITENAME and parameters)"
   log_warn "ACTION REQUIRED: sudo nano ${CONFIG_DIR}/settings.txt — set SITENAME (line 1)"
-  # Write auto-detected board into settings.txt (line 21)
+
+  # Write auto-detected board into settings.txt (line 21).
   sudo sed -i "21s/.*/${DETECTED_BOARD:-unknown}/" "${CONFIG_DIR}/settings.txt"
+
   if [[ "${DETECTED_BOARD:-unknown}" == "rpizero2w" ]]; then
     sudo sed -i "7s/.*/wlan0/" "${CONFIG_DIR}/settings.txt"
     sudo sed -i "9s/.*/wifi/" "${CONFIG_DIR}/settings.txt"
@@ -319,20 +347,23 @@ SETTINGS
     sudo sed -i "7s/.*/eth0/" "${CONFIG_DIR}/settings.txt"
     sudo sed -i "9s/.*/auto/" "${CONFIG_DIR}/settings.txt"
   fi
+
   log_ok "Board written to settings.txt: ${DETECTED_BOARD:-unknown}"
 else
   log_ok "settings.txt already exists — not overwritten"
 fi
 
-# server.txt — empty placeholder for SFTP
+# server.txt — empty placeholder for SFTP.
 if [[ ! -f "${CONFIG_DIR}/server.txt" ]]; then
   sudo touch "${CONFIG_DIR}/server.txt"
   log_ok "server.txt created (empty — SFTP disabled)"
+else
+  log_ok "server.txt already exists — not overwritten"
 fi
 
-# ftp_credentials.txt — placeholder only
+# ftp_credentials.txt — comment-only placeholder.
 if [[ ! -f "${CONFIG_DIR}/ftp_credentials.txt" ]]; then
-  sudo tee "${CONFIG_DIR}/ftp_credentials.txt" > /dev/null << 'FTP'
+  sudo tee "${CONFIG_DIR}/ftp_credentials.txt" >/dev/null <<'FTP'
 # FTP credentials — one value per line, uncomment only after configuration.
 # 1) FTP_HOST        e.g. 5.249.152.25
 # 2) FTP_PORT        e.g. 21, or provider-defined FTP port such as 22
@@ -340,16 +371,19 @@ if [[ ! -f "${CONFIG_DIR}/ftp_credentials.txt" ]]; then
 # 4) FTP_USER
 # 5) FTP_PASS
 FTP
+
   log_ok "ftp_credentials.txt created (comment-only — FTP disabled until configured)"
   log_warn "ACTION REQUIRED: sudo nano ${CONFIG_DIR}/ftp_credentials.txt — set real FTP credentials"
 else
   log_ok "ftp_credentials.txt already exists — not overwritten"
 fi
 
-# known_hosts — empty placeholder for SFTP
+# known_hosts — empty placeholder for SFTP.
 if [[ ! -f "${CONFIG_DIR}/known_hosts" ]]; then
   sudo touch "${CONFIG_DIR}/known_hosts"
   log_ok "known_hosts created (empty)"
+else
+  log_ok "known_hosts already exists — not overwritten"
 fi
 
 # Configuration files must be readable by phenocam but not world-readable.
@@ -358,34 +392,39 @@ sudo chown root:phenocam \
   "${CONFIG_DIR}/server.txt" \
   "${CONFIG_DIR}/ftp_credentials.txt" \
   "${CONFIG_DIR}/known_hosts"
+
 sudo chmod 640 \
   "${CONFIG_DIR}/settings.txt" \
   "${CONFIG_DIR}/server.txt" \
   "${CONFIG_DIR}/ftp_credentials.txt" \
   "${CONFIG_DIR}/known_hosts"
+
 log_ok "Configuration file permissions set (root:phenocam, 640)"
 
-# Generate SSH key pair for SFTP (only if not already present)
+# Generate SSH key pair for SFTP only if not already present.
 if [[ ! -f "${CONFIG_DIR}/keys/phenocam_key" ]]; then
   sudo ssh-keygen -t ed25519 \
     -f "${CONFIG_DIR}/keys/phenocam_key" \
     -N "" \
     -C "phenocam@$(hostname)" \
     -q
+
   log_ok "SSH key pair generated: ${CONFIG_DIR}/keys/phenocam_key"
 else
   log_ok "SSH key pair already exists — not regenerated"
 fi
 
-# Ensure the upload service user can read the SSH key pair
+# Ensure the upload service user can read the SSH key pair.
 sudo chown phenocam:phenocam \
   "${CONFIG_DIR}/keys/phenocam_key" \
   "${CONFIG_DIR}/keys/phenocam_key.pub"
+
 sudo chmod 600 "${CONFIG_DIR}/keys/phenocam_key"
 sudo chmod 644 "${CONFIG_DIR}/keys/phenocam_key.pub"
+
 log_ok "SSH key permissions aligned for user phenocam"
 
-log_ok "SSH public key (send to SFTP server administrator):"
+log_ok "SSH public key (send to SFTP server administrator if using SFTP):"
 echo ""
 sudo cat "${CONFIG_DIR}/keys/phenocam_key.pub"
 echo ""
@@ -393,7 +432,7 @@ echo ""
 # ── Step 8 — Install systemd units and udev rules ─────────────────────────────
 log_step "Installing systemd units and udev rules..."
 
-# Copy systemd units
+# Copy systemd units.
 for unit in "${SOFTWARE_DIR}/systemd/"*.service \
             "${SOFTWARE_DIR}/systemd/"*.timer \
             "${SOFTWARE_DIR}/systemd/"*.mount; do
@@ -402,7 +441,7 @@ for unit in "${SOFTWARE_DIR}/systemd/"*.service \
   log_ok "Installed: $(basename "$unit")"
 done
 
-# Install logrotate configuration
+# Install logrotate configuration.
 if [[ -f "${SOFTWARE_DIR}/config/phenocam.logrotate" ]]; then
   sudo cp "${SOFTWARE_DIR}/config/phenocam.logrotate" /etc/logrotate.d/phenocam
   sudo chmod 644 /etc/logrotate.d/phenocam
@@ -411,30 +450,31 @@ else
   log_warn "phenocam.logrotate not found — log rotation not installed"
 fi
 
-# Install udev rule
+# Install udev rule.
 sudo cp "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules" "${UDEV_DIR}/"
 sudo udevadm control --reload-rules
 log_ok "udev rule installed and reloaded (USB hot-plug enabled)"
 
-# Reload systemd
+# Reload systemd.
 sudo systemctl daemon-reload
 log_ok "systemd daemon reloaded"
 
-# ── Step 9 — Enable runtime RAMDISK init ──────────────────────────────────────
+# ── Step 9 — Enable runtime RAMDISK init and production timers ────────────────
 log_step "Enabling PhenoCam RAMDISK init..."
 
 sudo systemctl enable --now phenocam-init.service
 log_ok "phenocam-init.service: enabled and started (RAMDISK prepared)"
 
-# Check init result
+# Check init result.
 if systemctl is-failed phenocam-init.service >/dev/null 2>&1; then
-  log_err "phenocam-init.service failed. Check: sudo journalctl -u phenocam-init.service"
+  log_err "phenocam-init.service failed. Check:"
+  log_err "  sudo journalctl -u phenocam-init.service -n 120 --no-pager"
 else
   log_ok "phenocam-init.service completed successfully"
 fi
 
 # Enable production timers by default, but do not force an immediate run here.
-# after installation/configuration/reboot,
+# This restores the v1.3.x behaviour: after installation/configuration/reboot,
 # the system starts capture/upload cycles automatically.
 if [[ "${PHENOCAM_DISABLE_TIMERS:-0}" == "1" ]]; then
   sudo systemctl disable --now phenocam-capture.timer phenocam-upload.timer >/dev/null 2>&1 || true
@@ -460,19 +500,20 @@ echo -e "  ${BOLD}Camera:${NC} sudo /usr/local/lib/phenocam/bin/diag_camera.sh"
 echo -e "  ${BOLD}Upload:${NC} sudo /usr/local/lib/phenocam/bin/diag_upload.sh"
 echo ""
 
-# Remind about required configuration
+# Remind about required configuration.
 echo -e "${YELLOW}${BOLD}  Required actions before the system can upload images:${NC}"
-echo -e "${GREEN}  1. Set station name:${NC}"
+echo -e "${GREEN}  1. Set station name and timing/network parameters:${NC}"
 echo -e "${GREEN}     sudo nano /etc/phenocam/settings.txt${NC}"
-echo -e "${YELLOW}     (edit SITENAME on line 1 at minimum)${NC}"
+echo -e "${YELLOW}     Edit SITENAME on line 1 at minimum.${NC}"
 echo ""
 echo -e "${YELLOW}  Choose your upload protocol:${NC}"
 echo ""
 echo -e "${YELLOW}  FTP — edit credentials:${NC}"
 echo -e "${GREEN}     sudo nano /etc/phenocam/ftp_credentials.txt${NC}"
+echo -e "${YELLOW}     FTP port is configurable; use your provider value, even if it is 22.${NC}"
 echo ""
-echo -e "${YELLOW}  SFTP (recommended for security — SSH key, no password over network):${NC}"
-echo -e "${GREEN}     1. Send the public key above to your SFTP server administrator${NC}"
+echo -e "${YELLOW}  SFTP — SSH key, no password over network:${NC}"
+echo -e "${GREEN}     1. Send the public key printed above to your SFTP server administrator${NC}"
 echo -e "${GREEN}     2. sudo nano /etc/phenocam/server.txt  (add one or more server hostnames)${NC}"
 echo -e "${GREEN}     3. sudo ssh-keyscan -H <hostname> | sudo tee -a /etc/phenocam/known_hosts >/dev/null${NC}"
 echo -e "${GREEN}     4. Edit line 8 of settings.txt (SFTP_USER)${NC}"
@@ -480,16 +521,26 @@ echo -e "${GREEN}     5. Edit line 14 of settings.txt (REMOTE_LAYOUT: general or
 echo ""
 echo -e "${YELLOW}  Production timers:${NC}"
 echo -e "${GREEN}     Already enabled for boot by default.${NC}"
-echo -e "${GREEN}     To start them immediately after configuration:${NC}"
+echo -e "${GREEN}     Normal flow: configure files, then reboot.${NC}"
+echo -e "${GREEN}     Check boot enable state:${NC}"
+echo -e "${GREEN}     systemctl is-enabled phenocam-capture.timer phenocam-upload.timer${NC}"
+echo -e "${GREEN}     Check next runs:${NC}"
+echo -e "${GREEN}     systemctl list-timers 'phenocam-*' --all${NC}"
+echo -e "${GREEN}     To start them immediately without reboot:${NC}"
 echo -e "${GREEN}     sudo systemctl start phenocam-capture.timer phenocam-upload.timer${NC}"
 echo -e "${GREEN}     To disable automatic operation:${NC}"
 echo -e "${GREEN}     sudo systemctl disable --now phenocam-capture.timer phenocam-upload.timer${NC}"
 echo ""
 
-# Check if reboot may be needed
+# Check if reboot may be needed.
 if vcgencmd get_camera 2>/dev/null | grep -q "detected=0"; then
   echo -e "${YELLOW}${BOLD}  ⚠  REBOOT MAY BE REQUIRED: camera is not currently detected.${NC}"
   echo -e "${YELLOW}     Run: sudo reboot${NC}"
   echo -e "${YELLOW}     After reboot, check: sudo /usr/local/lib/phenocam/bin/diag_camera.sh${NC}"
+  echo ""
+else
+  echo -e "${YELLOW}${BOLD}  Recommended next step:${NC}"
+  echo -e "${YELLOW}     If you have just configured settings/upload files, run: sudo reboot${NC}"
+  echo -e "${YELLOW}     After reboot, timers should start automatically.${NC}"
   echo ""
 fi
