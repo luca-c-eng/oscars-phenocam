@@ -1,4 +1,5 @@
-# server.txt — list of SFTP servers, one hostname per line.
-# Leave this file empty to disable SFTP upload.
-# The software reads this file at every upload cycle.
-example.sftp-server.org
+# server.txt — SFTP server list
+# Leave this file /etc/phenocam/server.txt empty or comment-only to disable SFTP.
+# Add one hostname/IP per non-comment line to enable SFTP.
+
+# sftp.example.org
