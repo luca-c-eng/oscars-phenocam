@@ -1,12 +1,14 @@
 [Unit]
 Description=PhenoCam upload drain
-After=network-online.target run-phenocam.mount
+After=network-online.target phenocam-init.service run-phenocam.mount
 Wants=network-online.target
+Requires=phenocam-init.service run-phenocam.mount
 
 [Service]
 Type=oneshot
 User=phenocam
 Group=phenocam
+TimeoutStartSec=900
 ExecStart=/usr/local/lib/phenocam/bin/phenocam-upload.sh
 
 NoNewPrivileges=yes
