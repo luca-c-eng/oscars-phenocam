@@ -432,17 +432,19 @@ else
   log_ok "phenocam-init.service completed successfully"
 fi
 
-# Timers are not started automatically by default, to avoid capturing/uploading
-# with placeholder settings. Set PHENOCAM_ENABLE_TIMERS=1 to enable them during
-# installation after pre-seeding /etc/phenocam configuration.
-if [[ "${PHENOCAM_ENABLE_TIMERS:-0}" == "1" ]]; then
-  sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer
-  log_ok "phenocam-capture.timer enabled (fires at :00 and :30 every hour)"
-  log_ok "phenocam-upload.timer enabled (fires every 9 minutes)"
-else
+# Enable production timers by default, but do not force an immediate run here.
+# after installation/configuration/reboot,
+# the system starts capture/upload cycles automatically.
+if [[ "${PHENOCAM_DISABLE_TIMERS:-0}" == "1" ]]; then
   sudo systemctl disable --now phenocam-capture.timer phenocam-upload.timer >/dev/null 2>&1 || true
-  log_warn "Timers not started yet. Configure settings/upload first, then run:"
+  log_warn "Production timers disabled because PHENOCAM_DISABLE_TIMERS=1"
+  log_warn "Enable later with:"
   log_warn "  sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer"
+else
+  sudo systemctl enable phenocam-capture.timer phenocam-upload.timer
+  log_ok "phenocam-capture.timer enabled for boot (fires at :00 and :30 every hour)"
+  log_ok "phenocam-upload.timer enabled for boot (fires after boot, then every 9 minutes)"
+  log_warn "Timers are enabled for the next boot. They are not forced to run immediately by the installer."
 fi
 
 # ── Step 10 — Final report ────────────────────────────────────────────────────
@@ -475,8 +477,12 @@ echo -e "${GREEN}     3. sudo ssh-keyscan -H <hostname> | sudo tee -a /etc/pheno
 echo -e "${GREEN}     4. Edit line 8 of settings.txt (SFTP_USER)${NC}"
 echo -e "${GREEN}     5. Edit line 14 of settings.txt (REMOTE_LAYOUT: general or icos)${NC}"
 echo ""
-echo -e "${YELLOW}  After configuration, enable production timers:${NC}"
-echo -e "${GREEN}     sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer${NC}"
+echo -e "${YELLOW}  Production timers:${NC}"
+echo -e "${GREEN}     Already enabled for boot by default.${NC}"
+echo -e "${GREEN}     To start them immediately after configuration:${NC}"
+echo -e "${GREEN}     sudo systemctl start phenocam-capture.timer phenocam-upload.timer${NC}"
+echo -e "${GREEN}     To disable automatic operation:${NC}"
+echo -e "${GREEN}     sudo systemctl disable --now phenocam-capture.timer phenocam-upload.timer${NC}"
 echo ""
 
 # Check if reboot may be needed
