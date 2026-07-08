@@ -457,13 +457,6 @@ echo -e "  ${BOLD}Camera:${NC} sudo /usr/local/lib/phenocam/bin/diag_camera.sh"
 echo -e "  ${BOLD}Upload:${NC} sudo /usr/local/lib/phenocam/bin/diag_upload.sh"
 echo ""
 
-# Check if reboot needed (camera was just enabled)
-if vcgencmd get_camera 2>/dev/null | grep -q "detected=0"; then
-  echo -e "${YELLOW}${BOLD}  ⚠  REBOOT REQUIRED: camera was just enabled.${NC}"
-  echo -e "${YELLOW}     Run: sudo reboot${NC}"
-  echo ""
-fi
-
 # Remind about required configuration
 echo -e "${YELLOW}${BOLD}  Required actions before the system can upload images:${NC}"
 echo -e "${GREEN}  1. Set station name:${NC}"
@@ -485,3 +478,11 @@ echo ""
 echo -e "${YELLOW}  After configuration, enable production timers:${NC}"
 echo -e "${GREEN}     sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer${NC}"
 echo ""
+
+# Check if reboot may be needed
+if vcgencmd get_camera 2>/dev/null | grep -q "detected=0"; then
+  echo -e "${YELLOW}${BOLD}  ⚠  REBOOT MAY BE REQUIRED: camera is not currently detected.${NC}"
+  echo -e "${YELLOW}     Run: sudo reboot${NC}"
+  echo -e "${YELLOW}     After reboot, check: sudo /usr/local/lib/phenocam/bin/diag_camera.sh${NC}"
+  echo ""
+fi
