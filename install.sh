@@ -7,7 +7,7 @@ IFS=$'\n\t'
 # =============================================================================
 # Usage (run as any user with sudo privileges):
 #
-#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.3.0/install.sh | bash
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.4.0/software/install.sh | bash
 #
 # What this script does:
 #   1. Checks prerequisites (OS, hardware, network)
@@ -39,7 +39,7 @@ UDEV_DIR="/etc/udev/rules.d"
 
 # Pinned dependency versions (tested and verified)
 EXIFTOOL_VERSION="13.25+dfsg-1"
-EXPECTED_FILE_COUNT=40
+EXPECTED_FILE_COUNT=41
 
 # Colours for output
 RED='\033[0;31m'
@@ -164,6 +164,7 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/bin/phenocam-capture.sh"
   "${SOFTWARE_DIR}/bin/phenocam-upload.sh"
   "${SOFTWARE_DIR}/bin/phenocam-run.sh"
+  "${SOFTWARE_DIR}/bin/phenocam-init-ramdisk.sh"
   "${SOFTWARE_DIR}/bin/phenocam-usb-attach.sh"
   "${SOFTWARE_DIR}/bin/phenocam-usb-detach.sh"
 
@@ -179,6 +180,9 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/config/phenocam.logrotate"
 
   "${SOFTWARE_DIR}/systemd/phenocam-init.service"
+  "${SOFTWARE_DIR}/systemd/phenocam-capture.service"
+  "${SOFTWARE_DIR}/systemd/phenocam-upload.service"
+  "${SOFTWARE_DIR}/systemd/run-phenocam.mount"
   "${SOFTWARE_DIR}/systemd/phenocam-capture.timer"
   "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules"
 )
@@ -237,6 +241,7 @@ log_ok "phenocam added to video group"
 sudo mkdir -p \
   "${LIB_DIR}/bin" \
   "${LIB_DIR}/scripts" \
+  "${LIB_DIR}/docs" \
   "${CONFIG_DIR}/keys" \
   "${LOG_DIR}" \
   "/var/lib/phenocam/queue"
@@ -251,6 +256,16 @@ sudo cp "${SOFTWARE_DIR}/scripts/"*.sh "${LIB_DIR}/scripts/"
 sudo cp "${SOFTWARE_DIR}/bin/"*.sh     "${LIB_DIR}/bin/"
 sudo chmod +x "${LIB_DIR}/bin/"*.sh "${LIB_DIR}/scripts/"*.sh
 log_ok "Scripts deployed and made executable ($(find "${LIB_DIR}" -name "*.sh" | wc -l) files)"
+
+# Copy local documentation if present
+if [[ -d "${SOFTWARE_DIR}/docs" ]]; then
+  sudo cp -r "${SOFTWARE_DIR}/docs/." "${LIB_DIR}/docs/"
+fi
+for doc in README.md ReadME.txt CHANGELOG.md VERSIONS.txt; do
+  [[ -f "${SOFTWARE_DIR}/${doc}" ]] && sudo cp "${SOFTWARE_DIR}/${doc}" "${LIB_DIR}/docs/"
+done
+sudo chmod -R a+rX "${LIB_DIR}/docs"
+log_ok "Documentation deployed to ${LIB_DIR}/docs"
 
 # Set permissions
 sudo chmod 750 \
@@ -295,7 +310,14 @@ SETTINGS
   log_ok "settings.txt created (edit to set your SITENAME and parameters)"
   log_warn "ACTION REQUIRED: sudo nano ${CONFIG_DIR}/settings.txt — set SITENAME (line 1)"
   # Write auto-detected board into settings.txt (line 21)
-  sudo sed -i "21s/.*/\${DETECTED_BOARD:-unknown}/" "${CONFIG_DIR}/settings.txt"
+  sudo sed -i "21s/.*/${DETECTED_BOARD:-unknown}/" "${CONFIG_DIR}/settings.txt"
+  if [[ "${DETECTED_BOARD:-unknown}" == "rpizero2w" ]]; then
+    sudo sed -i "7s/.*/wlan0/" "${CONFIG_DIR}/settings.txt"
+    sudo sed -i "9s/.*/wifi/" "${CONFIG_DIR}/settings.txt"
+  elif [[ "${DETECTED_BOARD:-unknown}" == "rpi3b+" ]]; then
+    sudo sed -i "7s/.*/eth0/" "${CONFIG_DIR}/settings.txt"
+    sudo sed -i "9s/.*/auto/" "${CONFIG_DIR}/settings.txt"
+  fi
   log_ok "Board written to settings.txt: ${DETECTED_BOARD:-unknown}"
 else
   log_ok "settings.txt already exists — not overwritten"
@@ -310,13 +332,14 @@ fi
 # ftp_credentials.txt — placeholder only
 if [[ ! -f "${CONFIG_DIR}/ftp_credentials.txt" ]]; then
   sudo tee "${CONFIG_DIR}/ftp_credentials.txt" > /dev/null << 'FTP'
-YOUR_FTP_HOST_OR_IP
-YOUR_FTP_PORT
-/your/remote/base/path
-your_ftp_username
-your_ftp_password
+# FTP credentials — one value per line, uncomment only after configuration.
+# 1) FTP_HOST        e.g. 5.249.152.25
+# 2) FTP_PORT        e.g. 21, or provider-defined FTP port such as 22
+# 3) FTP_REMOTE_BASE e.g. /phenocams/data
+# 4) FTP_USER
+# 5) FTP_PASS
 FTP
-  log_ok "ftp_credentials.txt created (placeholder — edit with real values)"
+  log_ok "ftp_credentials.txt created (comment-only — FTP disabled until configured)"
   log_warn "ACTION REQUIRED: sudo nano ${CONFIG_DIR}/ftp_credentials.txt — set real FTP credentials"
 else
   log_ok "ftp_credentials.txt already exists — not overwritten"
@@ -327,6 +350,19 @@ if [[ ! -f "${CONFIG_DIR}/known_hosts" ]]; then
   sudo touch "${CONFIG_DIR}/known_hosts"
   log_ok "known_hosts created (empty)"
 fi
+
+# Configuration files must be readable by phenocam but not world-readable.
+sudo chown root:phenocam \
+  "${CONFIG_DIR}/settings.txt" \
+  "${CONFIG_DIR}/server.txt" \
+  "${CONFIG_DIR}/ftp_credentials.txt" \
+  "${CONFIG_DIR}/known_hosts"
+sudo chmod 640 \
+  "${CONFIG_DIR}/settings.txt" \
+  "${CONFIG_DIR}/server.txt" \
+  "${CONFIG_DIR}/ftp_credentials.txt" \
+  "${CONFIG_DIR}/known_hosts"
+log_ok "Configuration file permissions set (root:phenocam, 640)"
 
 # Generate SSH key pair for SFTP (only if not already present)
 if [[ ! -f "${CONFIG_DIR}/keys/phenocam_key" ]]; then
@@ -383,23 +419,11 @@ log_ok "udev rule installed and reloaded (USB hot-plug enabled)"
 sudo systemctl daemon-reload
 log_ok "systemd daemon reloaded"
 
-# ── Step 9 — Enable and start ─────────────────────────────────────────────────
-log_step "Enabling and starting PhenoCam..."
+# ── Step 9 — Enable runtime RAMDISK init ──────────────────────────────────────
+log_step "Enabling PhenoCam RAMDISK init..."
 
 sudo systemctl enable --now phenocam-init.service
-log_ok "phenocam-init.service: enabled and started (first capture+upload cycle running...)"
-
-# Wait for init service to complete
-TIMEOUT=120
-ELAPSED=0
-while systemctl is-active phenocam-init.service >/dev/null 2>&1; do
-  sleep 2
-  ELAPSED=$((ELAPSED + 2))
-  if [[ $ELAPSED -ge $TIMEOUT ]]; then
-    log_warn "phenocam-init.service taking longer than expected ($TIMEOUT s)."
-    break
-  fi
-done
+log_ok "phenocam-init.service: enabled and started (RAMDISK prepared)"
 
 # Check init result
 if systemctl is-failed phenocam-init.service >/dev/null 2>&1; then
@@ -408,10 +432,18 @@ else
   log_ok "phenocam-init.service completed successfully"
 fi
 
-# Enable timers
-sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer
-log_ok "phenocam-capture.timer enabled (fires at :00 and :30 every hour)"
-log_ok "phenocam-upload.timer enabled (fires every 9 minutes)"
+# Timers are not started automatically by default, to avoid capturing/uploading
+# with placeholder settings. Set PHENOCAM_ENABLE_TIMERS=1 to enable them during
+# installation after pre-seeding /etc/phenocam configuration.
+if [[ "${PHENOCAM_ENABLE_TIMERS:-0}" == "1" ]]; then
+  sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer
+  log_ok "phenocam-capture.timer enabled (fires at :00 and :30 every hour)"
+  log_ok "phenocam-upload.timer enabled (fires every 9 minutes)"
+else
+  sudo systemctl disable --now phenocam-capture.timer phenocam-upload.timer >/dev/null 2>&1 || true
+  log_warn "Timers not started yet. Configure settings/upload first, then run:"
+  log_warn "  sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer"
+fi
 
 # ── Step 10 — Final report ────────────────────────────────────────────────────
 echo ""
@@ -420,7 +452,7 @@ echo -e "${GREEN}${BOLD}  Installation complete — PhenoCam v$(cat "${SOFTWARE_
 echo -e "${GREEN}${BOLD}═══════════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Log:${NC}    sudo cat /var/log/phenocam/phenocam.log | tail -20"
-echo -e "  ${BOLD}Status:${NC} sudo systemctl status phenocam-capture.timer phenocam-upload.timer"
+echo -e "  ${BOLD}Status:${NC} sudo systemctl status phenocam-init.service phenocam-capture.timer phenocam-upload.timer"
 echo -e "  ${BOLD}Camera:${NC} sudo /usr/local/lib/phenocam/bin/diag_camera.sh"
 echo -e "  ${BOLD}Upload:${NC} sudo /usr/local/lib/phenocam/bin/diag_upload.sh"
 echo ""
@@ -449,4 +481,7 @@ echo -e "${GREEN}     2. sudo nano /etc/phenocam/server.txt  (add one or more se
 echo -e "${GREEN}     3. sudo ssh-keyscan -H <hostname> | sudo tee -a /etc/phenocam/known_hosts >/dev/null${NC}"
 echo -e "${GREEN}     4. Edit line 8 of settings.txt (SFTP_USER)${NC}"
 echo -e "${GREEN}     5. Edit line 14 of settings.txt (REMOTE_LAYOUT: general or icos)${NC}"
+echo ""
+echo -e "${YELLOW}  After configuration, enable production timers:${NC}"
+echo -e "${GREEN}     sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer${NC}"
 echo ""
