@@ -1,15 +1,14 @@
 [Unit]
 Description=RAMDISK for PhenoCam queue
-# The RAMDISK size is set to 20% of total RAM by phenocam-init.service
-# before this unit is (re)started. On first boot the size defaults to
-# 200m (safe for both RPi 3B+ and Zero 2W) and is adjusted on subsequent
-# boots once phenocam-init.service has written the correct value.
+Documentation=file:/usr/local/lib/phenocam/docs/README.md
 
 [Mount]
 What=tmpfs
 Where=/run/phenocam
 Type=tmpfs
-Options=size=200m,mode=0750
+# Default fallback. phenocam-init-ramdisk.sh rewrites this line at boot with
+# board-aware size and numeric uid/gid for the phenocam user.
+Options=size=100m,mode=0750
 
 [Install]
 WantedBy=multi-user.target
