@@ -7,6 +7,22 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [1.4.0] — 2026-07-07
 
+### Fixed after Zero 2 W validation (2026-07-08)
+- `run-phenocam.mount`: RAMDISK ownership is now made persistent through uid/gid-aware mount options written by `phenocam-init-ramdisk.sh`.
+- `phenocam-init.service`: removed fragile inline Bash RAMDISK calculation; runtime setup is delegated to `bin/phenocam-init-ramdisk.sh`.
+- `phenocam-capture.service`: added `TimeoutStartSec=300` because Zero 2W captures can legitimately exceed 30 seconds end-to-end.
+- `capture_vis.sh`: added headless `-n` capture mode and a wider GNU `timeout` guard. `CAPTURE_TIMEOUT` remains the rpicam warm-up time, not the OS guard.
+- `install.sh`: fixed board auto-detection write to settings line 21; no literal `${DETECTED_BOARD:-unknown}` is written anymore.
+- `install.sh`: production timers are not started by default until settings and upload credentials are configured.
+- `uploader_daemon.sh`: SFTP is enabled only when `server.txt` has effective non-comment content.
+- `uploader_daemon.sh`: FTP is enabled only when `ftp_credentials.txt` has five effective credential fields.
+- `uploader_daemon.sh`: if both SFTP and FTP are configured, local files are removed only after all configured targets succeed.
+- `upload_ftp.sh`: FTP port is fully configurable; FTP on port 22 remains `ftp://host:22/...` and is not converted to SFTP.
+
+### Documentation
+- Added `README.md` and structured docs under `software/docs/` for clean install, configuration, operations, and v1.4.0 development notes.
+
+
 ### Added
 - Multi-hardware support via `settings.txt` configuration (no separate branches):
   - `BOARD` (field 21): `rpi3b+` | `rpizero2w` | `unknown`
