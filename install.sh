@@ -63,7 +63,7 @@ log_step "Checking prerequisites..."
 [[ "$EUID" -ne 0 ]] || log_fatal "Do not run this script as root. Run as a regular user with sudo privileges."
 
 # Must have sudo
-sudo -n true 2>/dev/null || log_fatal "This script requires passwordless sudo, or run: sudo -v first."
+sudo -v || log_fatal "This script requires sudo privileges."
 
 # Check OS
 if grep -q "trixie" /etc/os-release 2>/dev/null; then
@@ -185,6 +185,7 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/systemd/run-phenocam.mount"
   "${SOFTWARE_DIR}/systemd/phenocam-capture.timer"
   "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules"
+  "${SOFTWARE_DIR}/systemd/phenocam-upload.timer"
 )
 
 for f in "${CRITICAL_FILES[@]}"; do
