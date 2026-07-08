@@ -7,7 +7,7 @@ IFS=$'\n\t'
 # =============================================================================
 # Usage (run as any user with sudo privileges):
 #
-#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.4.0/software/install.sh | bash
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.4.0/install.sh | bash
 #
 # What this script does:
 #   1. Checks prerequisites (OS, hardware, network)
