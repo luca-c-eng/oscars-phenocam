@@ -2,6 +2,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# 2 lines added in v1.5.0
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${BASE_DIR}/scripts/system_health.sh"
+
 # meta_build.sh — builds the .meta sidecar file for a captured image.
 # The .meta file contains three sections:
 #   [system]             — station info, network details, timestamp
@@ -63,6 +67,10 @@ build_meta() {
     echo "ip=${ip4}"
     echo "mac=${mac}"
     echo "image_file=$(basename "$jpg")"
+    echo ""
+    # two lines added in v1.5.0 for check the temperature of the board
+    echo "[system_health]"
+    print_system_health_kv
     echo ""
     echo "[capture_params_fixed]"
     echo "width=${WIDTH:-4608}"
