@@ -172,3 +172,14 @@ First stable release. Tested and verified on Phenocam01, Phenocam02, Phenocam03.
 - Orphan files in staging were never removed — added automatic cleanup
 
 ---
+
+---
+
+### Added in v1.5.0
+- Added Raspberry Pi system health metadata in `.meta` files:
+  - SoC temperature in Celsius
+  - `vcgencmd get_throttled` raw bitmask
+  - decoded undervoltage/throttling/soft-temperature flags
+  - ARM clock frequency
+- Added `diag_system_health.sh` for manual thermal and throttling diagnostics.
+- Added thermal monitoring documentation.
