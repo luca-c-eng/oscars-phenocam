@@ -46,7 +46,7 @@ UDEV_DIR="/etc/udev/rules.d"
 
 # Pinned dependency versions (tested and verified)
 EXIFTOOL_VERSION="13.25+dfsg-1"
-EXPECTED_FILE_COUNT=41
+EXPECTED_FILE_COUNT=43
 
 # Colours for output
 RED='\033[0;31m'
