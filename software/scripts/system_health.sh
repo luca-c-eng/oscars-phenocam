@@ -1,4 +1,3 @@
-# Funzioni comuni per temperatura, throttling, clock ARM
 #!/usr/bin/env bash
 set -euo pipefail
 IFS=$'\n\t'
