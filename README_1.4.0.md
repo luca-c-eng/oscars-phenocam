@@ -116,7 +116,7 @@ This branch includes fixes from the Raspberry Pi Zero 2 W validation session:
 ---
 
 ```markdown
-### Runtime health metadata from v1.5.0
+## Runtime health metadata from v1.5.0
 
 PhenoCam records Raspberry Pi system health in every `.meta` file:
 
@@ -125,3 +125,10 @@ PhenoCam records Raspberry Pi system health in every `.meta` file:
 soc_temp_c=48.2
 throttled_hex=0x0
 arm_clock_mhz=1000
+```
+to inspect current temperature, undervoltage and throttling state:
+
+```bash
+sudo /usr/local/lib/phenocam/bin/diag_system_health.sh
+```
+
