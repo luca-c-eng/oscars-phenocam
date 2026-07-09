@@ -101,7 +101,7 @@ Build meta -> /run/phenocam/staging/<site>_YYYY_MM_DD_HHMMSS.meta
 Enqueued: <base> -> /run/phenocam/queue
 FTP uploaded and removed: <base> from /run/phenocam/queue
 ```
-
+---
 ## v1.4.0 Zero 2 W lessons included
 
 This branch includes fixes from the Raspberry Pi Zero 2 W validation session:
@@ -113,3 +113,15 @@ This branch includes fixes from the Raspberry Pi Zero 2 W validation session:
 - `capture_vis.sh` uses `-n`/nopreview for headless installs and a wider external guard timeout.
 - FTP accepts provider-defined ports, including `22`, without converting to SFTP.
 - SFTP is skipped when `server.txt` has no effective configuration.
+---
+
+```markdown
+### Runtime health metadata from v1.5.0
+
+PhenoCam records Raspberry Pi system health in every `.meta` file:
+
+```text
+[system_health]
+soc_temp_c=48.2
+throttled_hex=0x0
+arm_clock_mhz=1000
