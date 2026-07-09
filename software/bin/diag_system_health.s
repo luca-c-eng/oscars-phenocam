@@ -1,4 +1,3 @@
-# Diagnostica manuale per RPi Zero 2 W e RPi 3B+
 #!/usr/bin/env bash
 set -euo pipefail
 IFS=$'\n\t'
