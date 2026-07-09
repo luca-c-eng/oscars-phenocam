@@ -200,6 +200,9 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/systemd/phenocam-capture.timer"
   "${SOFTWARE_DIR}/systemd/phenocam-upload.timer"
   "${SOFTWARE_DIR}/systemd/99-phenocam-usb.rules"
+  # next two lines added in v1.5.0 to check the temperature of the board.
+  "${SOFTWARE_DIR}/scripts/system_health.sh" 
+  "${SOFTWARE_DIR}/bin/diag_system_health.sh"
 )
 
 for f in "${CRITICAL_FILES[@]}"; do
