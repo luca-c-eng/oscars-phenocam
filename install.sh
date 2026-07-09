@@ -35,7 +35,7 @@ IFS=$'\n\t'
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/luca-c-eng/oscars-phenocam.git"
-REPO_BRANCH="dev/v1.4.0"
+REPO_BRANCH="dev/v1.5.0"
 INSTALL_DIR="/opt/oscars-phenocam"
 SOFTWARE_DIR="${INSTALL_DIR}/software"
 LIB_DIR="/usr/local/lib/phenocam"
