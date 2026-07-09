@@ -1,4 +1,4 @@
-# Clean installation — PhenoCam v1.4.0
+# Clean installation — PhenoCam v1.5.0
 
 This workflow is intended for a fresh Raspberry Pi OS Lite installation.
 
@@ -7,7 +7,7 @@ This workflow is intended for a fresh Raspberry Pi OS Lite installation.
 Run as the normal sudo-enabled user, not as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.4.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.5.0/install.sh | bash
 ```
 
 The installer deploys the software, creates the `phenocam` system user, installs systemd units, prepares `/run/phenocam`, and leaves capture/upload timers disabled until configuration is complete.
