@@ -26,6 +26,29 @@ get_iface() {
   echo ""
 }
 
+# function added in dev/v1.6.0
+print_phenocam_version_kv() {
+  local build_info="/usr/local/lib/phenocam/BUILD_INFO"
+  local version_file="/usr/local/lib/phenocam/VERSION"
+
+  if [[ -r "$build_info" ]]; then
+    grep -E '^(software_name|software_version|software_branch|software_commit|installed_at)=' "$build_info" || true
+    return 0
+  fi
+
+  echo "software_name=oscars-phenocam"
+
+  if [[ -r "$version_file" ]]; then
+    echo "software_version=$(head -n 1 "$version_file")"
+  else
+    echo "software_version=nd"
+  fi
+
+  echo "software_branch=nd"
+  echo "software_commit=nd"
+  echo "installed_at=nd"
+}
+
 build_meta() {
   local jpg="$1"
   local meta="$2"
