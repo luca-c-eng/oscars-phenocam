@@ -7,10 +7,12 @@ BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${BASE_DIR}/scripts/system_health.sh"
 
 # meta_build.sh — builds the .meta sidecar file for a captured image.
-# The .meta file contains three sections:
-#   [system]             — station info, network details, timestamp
+# The .meta file contains these sections:
+#   [system]               — station info, network details, timestamp
+#   [phenocam]             — oscars-phenocam software version/build info
+#   [system_health]        — Raspberry Pi temperature and throttling state
 #   [capture_params_fixed] — fixed capture parameters used for every shot
-#   [exif]               — full EXIF metadata extracted by exiftool
+#   [exif]                 — full EXIF metadata extracted by exiftool
 
 get_iface() {
   # If IFACE is set in settings, use it; otherwise auto-detect.
