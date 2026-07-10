@@ -7,11 +7,11 @@ IFS=$'\n\t'
 # =============================================================================
 # Usage (run as any user with sudo privileges):
 #
-#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.5.0/install.sh | bash
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.6.0/install.sh | bash
 #
 # Optional:
 #
-#  PHENOCAM_DISABLE_TIMERS=1 curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.5.0/install.sh | bash
+#  PHENOCAM_DISABLE_TIMERS=1 curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.6.0/install.sh | bash
 #
 # What this script does:
 #   1. Checks prerequisites (OS, hardware, network)
@@ -35,7 +35,7 @@ IFS=$'\n\t'
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/luca-c-eng/oscars-phenocam.git"
-REPO_BRANCH="dev/v1.5.0"
+REPO_BRANCH="dev/v1.6.0"
 INSTALL_DIR="/opt/oscars-phenocam"
 SOFTWARE_DIR="${INSTALL_DIR}/software"
 LIB_DIR="/usr/local/lib/phenocam"
@@ -46,7 +46,7 @@ UDEV_DIR="/etc/udev/rules.d"
 
 # Pinned dependency versions (tested and verified)
 EXIFTOOL_VERSION="13.25+dfsg-1"
-EXPECTED_FILE_COUNT=43
+EXPECTED_FILE_COUNT=46
 
 # Colours for output
 RED='\033[0;31m'
@@ -203,6 +203,10 @@ CRITICAL_FILES=(
   # next two lines added in v1.5.0 to check the temperature of the board.
   "${SOFTWARE_DIR}/scripts/system_health.sh" 
   "${SOFTWARE_DIR}/bin/diag_system_health.sh"
+   # next two lines added in v1.6.0 to test full cicle at first start.
+  "${SOFTWARE_DIR}/bin/phenocam-startup-cycle.sh"
+  "${SOFTWARE_DIR}/systemd/phenocam-startup-cycle.service"
+  "${SOFTWARE_DIR}/systemd/phenocam-startup-cycle.timer"
 )
 
 for f in "${CRITICAL_FILES[@]}"; do
@@ -480,14 +484,23 @@ fi
 # This restores the v1.3.x behaviour: after installation/configuration/reboot,
 # the system starts capture/upload cycles automatically.
 if [[ "${PHENOCAM_DISABLE_TIMERS:-0}" == "1" ]]; then
-  sudo systemctl disable --now phenocam-capture.timer phenocam-upload.timer >/dev/null 2>&1 || true
+  sudo systemctl disable --now \
+    phenocam-startup-cycle.timer \
+    phenocam-capture.timer \
+    phenocam-upload.timer >/dev/null 2>&1 || true
+
   log_warn "Production timers disabled because PHENOCAM_DISABLE_TIMERS=1"
   log_warn "Enable later with:"
-  log_warn "  sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer"
+  log_warn "  sudo systemctl enable --now phenocam-startup-cycle.timer phenocam-capture.timer phenocam-upload.timer"
 else
-  sudo systemctl enable phenocam-capture.timer phenocam-upload.timer
-  log_ok "phenocam-capture.timer enabled for boot (fires at :00 and :30 every hour)"
-  log_ok "phenocam-upload.timer enabled for boot (fires after boot, then every 9 minutes)"
+  sudo systemctl enable \
+    phenocam-startup-cycle.timer \
+    phenocam-capture.timer \
+    phenocam-upload.timer
+
+  log_ok "phenocam-startup-cycle.timer enabled for boot test cycle"
+  log_ok "phenocam-capture.timer enabled for boot (regular capture cycles)"
+  log_ok "phenocam-upload.timer enabled for boot (regular upload cycles)"
   log_warn "Timers are enabled for the next boot. They are not forced to run immediately by the installer."
 fi
 
@@ -530,7 +543,7 @@ echo -e "${GREEN}     systemctl is-enabled phenocam-capture.timer phenocam-uploa
 echo -e "${GREEN}     Check next runs:${NC}"
 echo -e "${GREEN}     systemctl list-timers 'phenocam-*' --all${NC}"
 echo -e "${GREEN}     To start them immediately without reboot:${NC}"
-echo -e "${GREEN}     sudo systemctl start phenocam-capture.timer phenocam-upload.timer${NC}"
+echo -e "${GREEN}     systemctl is-enabled phenocam-startup-cycle.timer phenocam-capture.timer phenocam-upload.timer${NC}"
 echo -e "${GREEN}     To disable automatic operation:${NC}"
 echo -e "${GREEN}     sudo systemctl disable --now phenocam-capture.timer phenocam-upload.timer${NC}"
 echo ""
