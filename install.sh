@@ -534,9 +534,11 @@ echo -e "${GREEN}${BOLD}  Installation complete — PhenoCam v$(cat "${SOFTWARE_
 echo -e "${GREEN}${BOLD}═══════════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Log:${NC}    sudo cat /var/log/phenocam/phenocam.log | tail -20"
-echo -e "  ${BOLD}Status:${NC} sudo systemctl status phenocam-init.service phenocam-capture.timer phenocam-upload.timer"
+echo -e "  ${BOLD}Status:${NC} sudo systemctl status phenocam-init.service phenocam-startup-cycle.timer phenocam-capture.timer phenocam-upload.timer"
 echo -e "  ${BOLD}Camera:${NC} sudo /usr/local/lib/phenocam/bin/diag_camera.sh"
 echo -e "  ${BOLD}Upload:${NC} sudo /usr/local/lib/phenocam/bin/diag_upload.sh"
+echo -e "  ${BOLD}Health:${NC} sudo /usr/local/lib/phenocam/bin/diag_system_health.sh"
+echo -e "  ${BOLD}Build:${NC}  cat /usr/local/lib/phenocam/BUILD_INFO"
 echo ""
 
 # Remind about required configuration.
