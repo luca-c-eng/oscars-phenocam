@@ -295,6 +295,27 @@ done
 sudo chmod -R a+rX "${LIB_DIR}/docs"
 log_ok "Documentation deployed to ${LIB_DIR}/docs"
 
+# Note: Install runtime version marker and Install runtime build information added in v1.6.0
+
+# Install runtime version marker.
+if [[ -f "${SOFTWARE_DIR}/VERSION" ]]; then
+  sudo cp "${SOFTWARE_DIR}/VERSION" "${LIB_DIR}/VERSION"
+  sudo chmod 644 "${LIB_DIR}/VERSION"
+  log_ok "Runtime VERSION installed to ${LIB_DIR}/VERSION"
+fi
+
+# Install runtime build information.
+{
+  echo "software_name=oscars-phenocam"
+  echo "software_version=$(cat "${SOFTWARE_DIR}/VERSION" 2>/dev/null || echo nd)"
+  echo "software_branch=${REPO_BRANCH}"
+  echo "software_commit=$(git -C "${INSTALL_DIR}" rev-parse --short HEAD 2>/dev/null || echo nd)"
+  echo "installed_at=$(date -Is)"
+} | sudo tee "${LIB_DIR}/BUILD_INFO" >/dev/null
+
+sudo chmod 644 "${LIB_DIR}/BUILD_INFO"
+log_ok "Runtime BUILD_INFO installed to ${LIB_DIR}/BUILD_INFO"
+
 # Set permissions.
 sudo chmod 750 \
   "${CONFIG_DIR}" \
