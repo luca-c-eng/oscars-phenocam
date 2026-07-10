@@ -4,6 +4,26 @@ All significant changes to this project are documented in this file.
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ---
+## dev/v1.6.0
+
+### Added
+- Added startup test cycle after boot:
+  - `phenocam-startup-cycle.timer`
+  - `phenocam-startup-cycle.service`
+  - `phenocam-startup-cycle.sh`
+- Added PhenoCam software version/build metadata in every `.meta` file through a new `[phenocam]` section.
+- Added runtime build files:
+  - `/usr/local/lib/phenocam/VERSION`
+  - `/usr/local/lib/phenocam/BUILD_INFO`
+
+### Changed
+- Installer now enables startup-cycle, capture and upload timers for boot by default.
+- Installer final report now includes health diagnostics and build/version inspection commands.
+- Metadata now distinguishes Raspberry Pi camera EXIF software from the PhenoCam software release.
+
+### Notes
+- The EXIF field `Software=rpicam-apps` refers to the Raspberry Pi camera stack.
+- The new `[phenocam]` metadata section identifies the oscars-phenocam software version and Git commit that produced the image.
 
 ## [1.4.0] — 2026-07-07
 
