@@ -305,14 +305,16 @@ if [[ -f "${SOFTWARE_DIR}/VERSION" ]]; then
 fi
 
 # Install runtime build information.
+SOFTWARE_VERSION="$(tr -d '\r\n' < "${SOFTWARE_DIR}/VERSION" 2>/dev/null || echo nd)"
+SOFTWARE_COMMIT="$(git -C "${INSTALL_DIR}" rev-parse --short HEAD 2>/dev/null || echo nd)"
+
 {
   echo "software_name=oscars-phenocam"
-  echo "software_version=$(cat "${SOFTWARE_DIR}/VERSION" 2>/dev/null || echo nd)"
+  echo "software_version=${SOFTWARE_VERSION}"
   echo "software_branch=${REPO_BRANCH}"
-  echo "software_commit=$(git -C "${INSTALL_DIR}" rev-parse --short HEAD 2>/dev/null || echo nd)"
+  echo "software_commit=${SOFTWARE_COMMIT}"
   echo "installed_at=$(date -Is)"
 } | sudo tee "${LIB_DIR}/BUILD_INFO" >/dev/null
-
 sudo chmod 644 "${LIB_DIR}/BUILD_INFO"
 log_ok "Runtime BUILD_INFO installed to ${LIB_DIR}/BUILD_INFO"
 
