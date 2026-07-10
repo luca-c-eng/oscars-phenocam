@@ -505,7 +505,7 @@ echo ""
 
 # Remind about required configuration.
 echo -e "${YELLOW}${BOLD}  Required actions before the system can upload images:${NC}"
-echo -e "${GREEN}  1. Set station name and timing/network parameters:${NC}"
+echo -e "${YELLOW}  1. Set station name and timing/network parameters:${NC}"
 echo -e "${GREEN}     sudo nano /etc/phenocam/settings.txt${NC}"
 echo -e "${YELLOW}     Edit SITENAME on line 1 at minimum.${NC}"
 echo ""
