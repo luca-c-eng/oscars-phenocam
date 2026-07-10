@@ -1,0 +1,11 @@
+[Unit]
+Description=Run PhenoCam startup test cycle once after boot
+
+[Timer]
+OnBootSec=2min
+AccuracySec=10s
+Persistent=false
+Unit=phenocam-startup-cycle.service
+
+[Install]
+WantedBy=timers.target
