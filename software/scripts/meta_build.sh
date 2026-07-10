@@ -93,7 +93,13 @@ build_meta() {
     echo "mac=${mac}"
     echo "image_file=$(basename "$jpg")"
     echo ""
-    # two lines added in v1.5.0 for check the temperature of the board
+
+    # Added in v1.6.0: PhenoCam software version/build info.
+    echo "[phenocam]"
+    print_phenocam_version_kv
+    echo ""
+
+    # Added in v1.5.0: Raspberry Pi temperature and throttling state.
     echo "[system_health]"
     print_system_health_kv
     echo ""
