@@ -7,7 +7,7 @@ IFS=$'\n\t'
 # =============================================================================
 # Usage (run as any user with sudo privileges):
 #
-#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.3.0/install.sh | bash
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/dev/v1.3.1/install.sh | bash
 #
 # What this script does:
 #   1. Checks prerequisites (OS, hardware, network)
@@ -28,7 +28,7 @@ IFS=$'\n\t'
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/luca-c-eng/oscars-phenocam.git"
-REPO_BRANCH="dev/v1.3.0"
+REPO_BRANCH="dev/v1.3.1"
 INSTALL_DIR="/opt/oscars-phenocam"
 SOFTWARE_DIR="${INSTALL_DIR}/software"
 LIB_DIR="/usr/local/lib/phenocam"
