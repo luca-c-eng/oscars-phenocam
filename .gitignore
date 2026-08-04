@@ -1,36 +1,67 @@
-# PhenoCam — .gitignore
-# This file tells Git which files to never track.
+# oscars-phenocam — repository ignore rules
+#
+# Keep source code, documentation, system definitions and *_example.txt
+# configuration templates under version control.
+# Operational configuration and runtime-generated data must never be committed.
 
-# ── CREDENTIALS — never commit these ──────────────────────────────────────
-# FTP and SFTP credentials contain plain-text passwords.
-# Create these files manually on the RPi during installation.
-software/config/ftp_credentials.txt
-ftp_credentials.txt
+# -----------------------------------------------------------------------------
+# Operational configuration
+# -----------------------------------------------------------------------------
 
-# SSH private keys
-*.pem
-phenocam_key
-id_ed25519
-id_rsa
+/software/config/settings.txt
+/software/config/server.txt
+/software/config/ftp_credentials.txt
+/software/config/known_hosts
+/software/config/keys/
 
-# ── SYSTEM FILES ───────────────────────────────────────────────────────────
+# Prevent accidental copies of operational configuration at repository root.
+
+/settings.txt
+/server.txt
+/ftp_credentials.txt
+/known_hosts
+/keys/
+
+# PhenoCam SSH identity generated during installation.
+
+**/phenocam_key
+**/phenocam_key.pub
+
+# -----------------------------------------------------------------------------
+# Runtime files
+# -----------------------------------------------------------------------------
+
+*.log
+*.log.*
+*.lock
+*.pid
+*.tmp
+
+# -----------------------------------------------------------------------------
+# Generated capture pairs
+# -----------------------------------------------------------------------------
+
+*_????_??_??_??????.jpg
+*_????_??_??_??????.meta
+
+# -----------------------------------------------------------------------------
+# Operating-system files
+# -----------------------------------------------------------------------------
+
 .DS_Store
 Thumbs.db
-desktop.ini
+[Dd]esktop.ini
 
-# ── EDITOR AND IDE ─────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Editors and IDEs
+# -----------------------------------------------------------------------------
+
 .vscode/
 .idea/
+
 *.swp
 *.swo
 *~
-
-# ── LOGS AND RUNTIME DATA ──────────────────────────────────────────────────
-*.log
-*.lock
-
-# ── CAPTURED DATA ─────────────────────────────────────────────────────────
-# Image and metadata files should not be committed to the repository.
-*.jpg
-*.jpeg
-*.meta
+*.bak
+*.orig
+*.rej
