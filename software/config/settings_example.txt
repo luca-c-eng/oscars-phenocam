@@ -1,6 +1,8 @@
 # settings.txt (positional format)
-# One value per line. Empty lines and comments (#) are ignored.
-# Fields are read by position — do not change the order.
+# One value per field.
+# Blank lines and comment lines beginning with # are ignored.
+# Fields are read by position — do not change their order.
+# A blank line cannot represent a field value: use the documented keyword.
 
 # 1) SITENAME — unique identifier for this PhenoCam station
 mysite_phenocam01
