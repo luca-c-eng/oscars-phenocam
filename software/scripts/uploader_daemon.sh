@@ -4,12 +4,14 @@ IFS=$'\n\t'
 
 # uploader_daemon.sh — drains all queues by uploading jpg+meta pairs to servers.
 # Supports SFTP (SSH key) and FTP (user+password) simultaneously.
-# Upload method is selected based on which configuration files are present:
+# Upload method is selected from the active configuration:
 #
-#   server.txt non-empty + ftp_credentials.txt non-empty → both SFTP and FTP
-#   server.txt non-empty only                            → SFTP only
-#   ftp_credentials.txt non-empty only                   → FTP only
-#   both empty                                           → warning, no upload
+#   server.txt with an active entry + non-empty ftp_credentials.txt → SFTP and FTP
+#   server.txt with an active entry only                            → SFTP only
+#   non-empty ftp_credentials.txt only                              → FTP only
+#   neither configured                                              → warning, no upload
+#
+# Blank lines and comment lines in server.txt do not enable SFTP.
 #
 # Requires:
 #   - common.sh          (logging)
