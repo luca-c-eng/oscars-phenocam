@@ -22,8 +22,20 @@ IFS=$'\n\t'
 list_pairs_in_dir() {
   local d="$1"
   [[ -d "$d" ]] || return 0
+
   find "$d" -maxdepth 1 -type f -name '*.meta' -printf '%f\n' 2>/dev/null \
-    | sed 's/\.meta$//' | sort
+    | sed 's/\.meta$//' \
+    | sort
+}
+
+# Returns success only when the configuration file contains at least one
+# non-empty, non-comment line.
+has_active_config_line() {
+  local file="$1"
+
+  [[ -f "$file" ]] || return 1
+
+  grep -Eq '^[[:space:]]*[^#[:space:]]' "$file"
 }
 
 # upload_dir_once — drains one queue directory via SFTP.
