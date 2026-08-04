@@ -110,10 +110,13 @@ drain_all_queues() {
   local sftp_delete=false
   local ftp_delete=false
 
-  [[ -s "$server_list" ]]      && use_sftp=true
-  [[ -s "$ftp_credentials" ]]  && use_ftp=true
+  if has_active_config_line "$server_list"; then
+    use_sftp=true
+  fi
 
-    # Delete local files only after the last enabled upload target succeeds.
+  [[ -s "$ftp_credentials" ]] && use_ftp=true
+
+  # Delete local files only after the last enabled upload target succeeds.
   if [[ "$use_sftp" == true && "$use_ftp" == false ]]; then
     sftp_delete=true
   fi
