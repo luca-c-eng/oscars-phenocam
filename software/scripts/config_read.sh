@@ -10,7 +10,11 @@ read_settings() {
   [[ -f "$f" ]] || return 1
 
   # Read non-empty, non-comment lines only.
-  mapfile -t L < <(grep -vE '^\s*#' "$f" | sed '/^\s*$/d')
+  # Blank lines are formatting separators and never represent field values.
+  mapfile -t L < <(
+    grep -vE '^[[:space:]]*#' "$f" \
+      | sed '/^[[:space:]]*$/d'
+  )
 
   # Minimum 6 required fields.
   [[ "${#L[@]}" -ge 6 ]] || return 2
