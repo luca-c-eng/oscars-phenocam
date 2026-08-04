@@ -287,17 +287,10 @@ if [[ ! -f "${CONFIG_DIR}/server.txt" ]]; then
   log_ok "server.txt created (empty — SFTP disabled)"
 fi
 
-# ftp_credentials.txt — placeholder only
+# ftp_credentials.txt — empty file means FTP disabled
 if [[ ! -f "${CONFIG_DIR}/ftp_credentials.txt" ]]; then
-  sudo tee "${CONFIG_DIR}/ftp_credentials.txt" > /dev/null << 'FTP'
-YOUR_FTP_HOST_OR_IP
-YOUR_FTP_PORT
-/your/remote/base/path
-your_ftp_username
-your_ftp_password
-FTP
-  log_ok "ftp_credentials.txt created (placeholder — edit with real values)"
-  log_warn "ACTION REQUIRED: sudo nano ${CONFIG_DIR}/ftp_credentials.txt — set real FTP credentials"
+  sudo touch "${CONFIG_DIR}/ftp_credentials.txt"
+  log_ok "ftp_credentials.txt created (empty — FTP disabled)"
 else
   log_ok "ftp_credentials.txt already exists — not overwritten"
 fi
