@@ -131,13 +131,6 @@ oscars-phenocam/
 
 ## Quick Installation
 
-> **Branch note**
-> This repository currently provides two installation tracks:
-> - `main` for the stable installation path
-> - `dev/v1.3.0` for testing the current development version
->
-> Use the development installer only if you explicitly want to test the latest branch-specific changes before they are merged into `main`.
-
 ### Prerequisites
 
 - Raspberry Pi 3B+ with **Raspberry Pi OS 64-bit Lite** (Debian 13 trixie, 2025-12-04) flashed using **Raspberry Pi Imager v2.0.6**
