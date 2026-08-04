@@ -111,11 +111,3 @@ Phenocam03.
 - Trailing space in ftp_credentials.txt caused "URL bad/illegal format"
 - Orphan files in staging were never removed — added automatic cleanup
 
----
-
-## [Unreleased]
-
-### TODO (eventually - to evaluate)
-- PhenoCam Network directory structure compatibility (sitename/YYYY/MM/)
-- Clarify .meta format requirements with PhenoCam Network
-- Manual stop/start commands (phenocam-stop, phenocam-start)
