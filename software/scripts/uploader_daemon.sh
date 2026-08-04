@@ -126,7 +126,7 @@ drain_all_queues() {
   fi
 
   if [[ "$use_sftp" == false && "$use_ftp" == false ]]; then
-    warn "No upload method configured (server.txt and ftp_credentials.txt are both empty)"
+    warn "No upload method configured: server.txt has no active SFTP entries and ftp_credentials.txt is empty"
     return 0
   fi
 
