@@ -52,7 +52,7 @@ build_meta() {
   now_iso="$(date -Is)"
 
   if [[ -n "$iface" ]]; then
-    ip4="$(ip -4 -o addr show "$iface" | awk '{print $4}' | cut -d/ -f1 || true)"
+    ip4="$(iface_ipv4 "$iface")"
     mac="$(cat "/sys/class/net/$iface/address" 2>/dev/null || true)"
   fi
 
