@@ -338,7 +338,7 @@ log_ok "Permissions set"
 log_step "Creating configuration files..."
 
 # settings.txt — create only if not already present.
-if [[ ! -f "${CONFIG_DIR}/settings.txt" ]]; then
+if ! sudo test -f "${CONFIG_DIR}/settings.txt"; then
   sudo tee "${CONFIG_DIR}/settings.txt" >/dev/null <<'SETTINGS'
 mysite
 +1
