@@ -5,6 +5,40 @@ IFS=$'\n\t'
 # config_read.sh — reads settings.txt (positional format) and exports
 # all configuration variables for use by other scripts.
 
+# configure_station_timezone — configure a fixed station timezone from UTC_OFFSET.
+#
+# PhenoCam station time never applies daylight saving time.
+# Examples:
+#   UTC_OFFSET=+1  -> fixed UTC+1 all year
+#   UTC_OFFSET=-5  -> fixed UTC-5 all year
+#   UTC_OFFSET=0   -> UTC
+configure_station_timezone() {
+  local raw="${UTC_OFFSET:-}"
+  local sign offset
+
+  if [[ "$raw" == "0" || "$raw" == "+0" || "$raw" == "-0" ]]; then
+    TZ="UTC0"
+    TZ_LABEL="UTC+0"
+  elif [[ "$raw" =~ ^([+-])([0-9]|1[0-4])(:[0-5][0-9])?$ ]]; then
+    sign="${BASH_REMATCH[1]}"
+    offset="${BASH_REMATCH[2]}${BASH_REMATCH[3]:-}"
+
+    # POSIX TZ offsets use the opposite sign:
+    # UTC-1 means local time UTC+1.
+    if [[ "$sign" == "+" ]]; then
+      TZ="UTC-${offset}"
+    else
+      TZ="UTC+${offset}"
+    fi
+
+    TZ_LABEL="UTC${raw}"
+  else
+    return 1
+  fi
+
+  export TZ TZ_LABEL
+}
+
 read_settings() {
   local f="$1"
   [[ -f "$f" ]] || return 1
@@ -48,6 +82,9 @@ read_settings() {
 
   # Defensive defaults: never export an invalid capture timeout.
   [[ "$CAPTURE_TIMEOUT" =~ ^[0-9]+$ ]] || CAPTURE_TIMEOUT="30000"
+
+  # Apply fixed station time. DST is intentionally never used.
+  configure_station_timezone || return 3
 
   export SITENAME UTC_OFFSET TZ_LABEL START_HOUR END_HOUR INTERVAL_MIN
   export IFACE SFTP_USER NET_MODE RAM_MIN_FREE_MB SD_MAX_USED_PCT
