@@ -5,6 +5,7 @@ IFS=$'\n\t'
 # 2 lines added in v1.5.0
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${BASE_DIR}/scripts/system_health.sh"
+source "${BASE_DIR}/scripts/net_check.sh"
 
 # meta_build.sh — builds the .meta sidecar file for a captured image.
 # The .meta file contains these sections:
