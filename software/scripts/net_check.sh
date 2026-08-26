@@ -10,34 +10,57 @@ has_internet() {
   ip route get 1.1.1.1 >/dev/null 2>&1
 }
 
-# resolve_iface — returns the network interface to use, based on settings.
-# Priority: explicit IFACE setting → NET_MODE hint → auto-detect.
+# resolve_iface — returns the network interface to use.
+#
+# Priority:
+#   1. Explicit IFACE value, when IFACE is not "auto"
+#   2. NET_MODE ethernet/wifi hint
+#   3. Interface selected by the kernel default route
+#   4. First non-loopback interface with a global IPv4 address
 resolve_iface() {
-  local i
+  local requested="${IFACE:-auto}"
+  local mode="${NET_MODE:-auto}"
+  local route_iface=""
 
-  if [[ -n "${IFACE:-}" ]]; then
-    ip link show "$IFACE" >/dev/null 2>&1 && { echo "$IFACE"; return 0; }
+  # Explicit interface requested by configuration.
+  if [[ -n "$requested" && "$requested" != "auto" ]]; then
+    if ip link show "$requested" >/dev/null 2>&1; then
+      echo "$requested"
+      return 0
+    fi
   fi
 
-  case "${NET_MODE:-auto}" in
+  case "$mode" in
     ethernet)
-      for i in eth0 en*; do
-        ip link show "$i" >/dev/null 2>&1 && { echo "$i"; return 0; }
-      done
+      ip -o -4 addr show scope global \
+        | awk '$2 ~ /^(eth|en)/ {print $2; exit}'
+      return 0
       ;;
+
     wifi)
-      for i in wlan0 wl*; do
-        ip link show "$i" >/dev/null 2>&1 && { echo "$i"; return 0; }
-      done
+      ip -o -4 addr show scope global \
+        | awk '$2 ~ /^(wlan|wl)/ {print $2; exit}'
+      return 0
       ;;
+
     auto|*)
-      ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$' | while read -r i; do
-        ip -4 addr show "$i" | grep -q 'inet ' && { echo "$i"; return 0; }
-      done
+      # Prefer the interface actually selected by the kernel for Internet traffic.
+      route_iface="$(
+        ip route get 1.1.1.1 2>/dev/null \
+          | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}'
+      )"
+
+      if [[ -n "$route_iface" ]] &&
+         ip -4 addr show "$route_iface" 2>/dev/null | grep -q 'inet '; then
+        echo "$route_iface"
+        return 0
+      fi
+
+      # Fallback when no Internet/default route is currently available.
+      ip -o -4 addr show scope global \
+        | awk '$2 != "lo" {print $2; exit}'
       ;;
   esac
-
-  echo ""
 }
 
 # iface_ipv4 <interface> — returns the IPv4 address of the given interface.
