@@ -307,7 +307,7 @@ fi
 
 # Install runtime build information.
 SOFTWARE_VERSION="$(tr -d '\r\n' < "${SOFTWARE_DIR}/VERSION" 2>/dev/null || echo nd)"
-SOFTWARE_COMMIT="$(git -C "${INSTALL_DIR}" rev-parse --short HEAD 2>/dev/null || echo nd)"
+SOFTWARE_COMMIT="$(sudo git -C "${INSTALL_DIR}" rev-parse --short HEAD 2>/dev/null || echo nd)"
 
 {
   echo "software_name=oscars-phenocam"
