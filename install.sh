@@ -380,7 +380,7 @@ else
 fi
 
 # server.txt — empty placeholder for SFTP.
-if [[ ! -f "${CONFIG_DIR}/server.txt" ]]; then
+if ! sudo test -f "${CONFIG_DIR}/server.txt"; then
   sudo touch "${CONFIG_DIR}/server.txt"
   log_ok "server.txt created (empty — SFTP disabled)"
 else
