@@ -24,7 +24,7 @@ read_settings() {
   INTERVAL_MIN="${L[5]}"
 
   # Optional fields (backward compatible — defaults applied if missing):
-  IFACE="${L[6]:-}"                        # e.g. eth0, wlan0, usb0 — empty = auto-detect
+  IFACE="${L[6]:-auto}"                    # auto | eth0 | wlan0 | other explicit interface
   SFTP_USER="${L[7]:-}"                    # SFTP username on the remote server
 
   NET_MODE="${L[8]:-auto}"                 # auto | ethernet | wifi
