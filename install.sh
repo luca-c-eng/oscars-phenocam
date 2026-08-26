@@ -11,7 +11,8 @@ IFS=$'\n\t'
 #
 # Optional:
 #
-#  PHENOCAM_DISABLE_TIMERS=1 curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.7.0/install.sh | bash
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.7.0/install.sh -o install.sh
+#  PHENOCAM_DISABLE_TIMERS=1 bash install.sh
 #
 # What this script does:
 #   1. Checks prerequisites (OS, hardware, network)
