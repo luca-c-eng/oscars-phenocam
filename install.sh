@@ -346,7 +346,7 @@ Europe/Rome
 6
 22
 30
-eth0
+auto
 phenocam
 auto
 20
@@ -371,13 +371,8 @@ SETTINGS
   # Write auto-detected board into settings.txt (line 21).
   sudo sed -i "21s/.*/${DETECTED_BOARD:-unknown}/" "${CONFIG_DIR}/settings.txt"
 
-  if [[ "${DETECTED_BOARD:-unknown}" == "rpizero2w" ]]; then
-    sudo sed -i "7s/.*/wlan0/" "${CONFIG_DIR}/settings.txt"
-    sudo sed -i "9s/.*/wifi/" "${CONFIG_DIR}/settings.txt"
-  elif [[ "${DETECTED_BOARD:-unknown}" == "rpi3b+" ]]; then
-    sudo sed -i "7s/.*/eth0/" "${CONFIG_DIR}/settings.txt"
-    sudo sed -i "9s/.*/auto/" "${CONFIG_DIR}/settings.txt"
-  fi
+  # Network interface is not derived from the Raspberry Pi model.
+  # IFACE=auto lets runtime networking follow the active/default route.
 
   log_ok "Board written to settings.txt: ${DETECTED_BOARD:-unknown}"
 else
