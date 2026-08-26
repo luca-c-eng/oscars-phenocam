@@ -388,7 +388,7 @@ else
 fi
 
 # ftp_credentials.txt — comment-only placeholder.
-if [[ ! -f "${CONFIG_DIR}/ftp_credentials.txt" ]]; then
+if ! sudo test -f "${CONFIG_DIR}/ftp_credentials.txt"; then
   sudo tee "${CONFIG_DIR}/ftp_credentials.txt" >/dev/null <<'FTP'
 # FTP credentials — one value per line, uncomment only after configuration.
 # 1) FTP_HOST        e.g. 5.249.152.25
