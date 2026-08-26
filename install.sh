@@ -342,7 +342,7 @@ if ! sudo test -f "${CONFIG_DIR}/settings.txt"; then
   sudo tee "${CONFIG_DIR}/settings.txt" >/dev/null <<'SETTINGS'
 mysite
 +1
-Europe/Rome
+UTC+1
 6
 22
 30
