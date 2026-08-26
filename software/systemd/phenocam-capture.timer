@@ -2,7 +2,7 @@
 Description=PhenoCam capture timer
 
 [Timer]
-OnCalendar=*:0,30
+OnCalendar=*-*-* *:00,30:00 UTC
 AccuracySec=10s
 Persistent=false
 
