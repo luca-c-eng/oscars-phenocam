@@ -15,17 +15,6 @@ source "${BASE_DIR}/scripts/net_check.sh"
 #   [capture_params_fixed] — fixed capture parameters used for every shot
 #   [exif]                 — full EXIF metadata extracted by exiftool
 
-get_iface() {
-  # If IFACE is set in settings, use it; otherwise auto-detect.
-  if [[ -n "${IFACE:-}" ]]; then
-    echo "$IFACE"; return 0
-  fi
-  # Auto-detect: first non-loopback interface UP with an IPv4 address.
-  ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$' | while read -r i; do
-    ip -4 addr show "$i" | grep -q 'inet ' && { echo "$i"; return 0; }
-  done
-  echo ""
-}
 
 # function added in dev/v1.6.0
 print_phenocam_version_kv() {
