@@ -405,7 +405,7 @@ else
 fi
 
 # known_hosts — empty placeholder for SFTP.
-if [[ ! -f "${CONFIG_DIR}/known_hosts" ]]; then
+if ! sudo test -f "${CONFIG_DIR}/known_hosts"; then
   sudo touch "${CONFIG_DIR}/known_hosts"
   log_ok "known_hosts created (empty)"
 else
