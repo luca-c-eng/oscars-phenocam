@@ -428,7 +428,7 @@ sudo chmod 640 \
 log_ok "Configuration file permissions set (root:phenocam, 640)"
 
 # Generate SSH key pair for SFTP only if not already present.
-if [[ ! -f "${CONFIG_DIR}/keys/phenocam_key" ]]; then
+if ! sudo test -f "${CONFIG_DIR}/keys/phenocam_key"; then
   sudo ssh-keygen -t ed25519 \
     -f "${CONFIG_DIR}/keys/phenocam_key" \
     -N "" \
