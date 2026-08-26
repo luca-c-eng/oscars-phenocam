@@ -46,7 +46,7 @@ build_meta() {
   command -v exiftool >/dev/null 2>&1 || return 11
 
   local iface ip4 mac now_iso
-  iface="$(get_iface)"
+  iface="$(resolve_iface)"
   ip4=""
   mac=""
   now_iso="$(date -Is)"
