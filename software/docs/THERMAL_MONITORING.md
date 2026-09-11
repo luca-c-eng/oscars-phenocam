@@ -1,74 +1,12 @@
-# Documentazione specifica v1.5.0 per l'aggiunta della lettura temperatura della board
-# Thermal and throttling monitoring
+# System Health and Thermal Monitoring
 
-PhenoCam records Raspberry Pi runtime health information in every `.meta` file.
+OSCARS-PHENOCAM records Raspberry Pi health information during metadata generation and provides a command for manual inspection.
 
-This feature is intended for Raspberry Pi Zero 2 W and Raspberry Pi 3B+, but it uses standard Raspberry Pi OS interfaces and should also work on other Raspberry Pi boards.
+The monitoring is passive: the current software does not stop captures, change their frequency, restart services, or generate alerts in response to temperature or throttling conditions.
 
-## Recorded metadata
+---
 
-Each `.meta` file contains a section named:
-
-```text
-[system_health]
-```
-
-Example:
-
-```text
-[system_health]
-soc_temp_c=48.2
-throttled_hex=0x0
-arm_clock_mhz=1000
-undervoltage_now=0
-arm_freq_capped_now=0
-throttled_now=0
-soft_temp_limit_now=0
-undervoltage_occurred=0
-arm_freq_capped_occurred=0
-throttled_occurred=0
-soft_temp_limit_occurred=0
-```
-
-## Field meaning
-
-| Field                      | Meaning                                               |
-| -------------------------- | ----------------------------------------------------- |
-| `soc_temp_c`               | Raspberry Pi SoC/core temperature in degrees Celsius  |
-| `throttled_hex`            | Raw `vcgencmd get_throttled` bitmask                  |
-| `arm_clock_mhz`            | Instantaneous ARM clock frequency in MHz              |
-| `undervoltage_now`         | `1` if undervoltage is currently detected             |
-| `arm_freq_capped_now`      | `1` if ARM frequency is currently capped              |
-| `throttled_now`            | `1` if the system is currently throttled              |
-| `soft_temp_limit_now`      | `1` if the soft temperature limit is currently active |
-| `undervoltage_occurred`    | `1` if undervoltage occurred since boot               |
-| `arm_freq_capped_occurred` | `1` if ARM frequency capping occurred since boot      |
-| `throttled_occurred`       | `1` if throttling occurred since boot                 |
-| `soft_temp_limit_occurred` | `1` if the soft temperature limit occurred since boot |
-
-## Normal values
-
-The ideal value is:
-
-```text
-throttled_hex=0x0
-```
-
-This means no current or historical undervoltage, throttling, frequency capping, or soft temperature limit flags since boot.
-
-## Temperature interpretation
-
-| SoC temperature | Interpretation                |
-| --------------: | ----------------------------- |
-|       `< 60 °C` | Normal                        |
-|      `60–70 °C` | Warm but generally acceptable |
-|      `70–80 °C` | Monitor                       |
-|      `80–85 °C` | ARM throttling may occur      |
-|      `>= 85 °C` | Higher throttling risk        |
-
-For Raspberry Pi 3B+, the default soft temperature limit is 60 °C. When this limit is reached, the CPU clock may be reduced from 1.4 GHz to 1.2 GHz.
-
-## Manual diagnostic command
+## Manual Health Check
 
 Run:
 
@@ -76,18 +14,159 @@ Run:
 sudo /usr/local/lib/phenocam/bin/diag_system_health.sh
 ```
 
-Expected healthy output includes:
+The command displays:
+
+* SoC temperature;
+* raw throttling status;
+* ARM clock frequency;
+* current power and throttling flags;
+* conditions recorded since boot.
+
+---
+
+## Temperature
+
+The software reads the SoC temperature from:
 
 ```text
-soc_temp_c=...
-throttled_hex=0x0
-undervoltage_now=0
-throttled_now=0
+/sys/class/thermal/thermal_zone0/temp
 ```
 
-## Notes
+If this source is unavailable, it attempts:
 
-These values do not represent ambient air temperature. They represent internal Raspberry Pi runtime health.
+```bash
+vcgencmd measure_temp
+```
 
-To measure true environmental temperature, add an external sensor such as DS18B20, BME280, SHT31, or similar.
+The value is reported in degrees Celsius with one decimal place:
 
+```text
+soc_temp_c=<value>
+```
+
+If no temperature source is available, the value is:
+
+```text
+soc_temp_c=nd
+```
+
+### Diagnostic Temperature Guide
+
+The diagnostic script reports the following interpretation:
+
+| Temperature       | Interpretation             |
+| ----------------- | -------------------------- |
+| Below `60 °C`     | Normal                     |
+| `60–70 °C`        | Warm, generally acceptable |
+| `70–80 °C`        | Monitor                    |
+| `80–85 °C`        | ARM throttling may occur   |
+| `85 °C` or higher | Stronger throttling risk   |
+
+These ranges are informational only and do not trigger automatic actions.
+
+---
+
+## Throttling Status
+
+The raw Raspberry Pi status is read with:
+
+```bash
+vcgencmd get_throttled
+```
+
+It is recorded as:
+
+```text
+throttled_hex=<hexadecimal value>
+```
+
+A value of:
+
+```text
+throttled_hex=0x0
+```
+
+means that none of the current or historical flags decoded by the software are set.
+
+---
+
+## Current Flags
+
+| Field                 | Bit | Meaning when equal to `1`                      |
+| --------------------- | --: | ---------------------------------------------- |
+| `undervoltage_now`    |   0 | Supply voltage is currently too low            |
+| `arm_freq_capped_now` |   1 | ARM frequency is currently capped              |
+| `throttled_now`       |   2 | The system is currently throttled              |
+| `soft_temp_limit_now` |   3 | The soft temperature limit is currently active |
+
+---
+
+## Historical Flags
+
+| Field                      | Bit | Meaning when equal to `1`                          |
+| -------------------------- | --: | -------------------------------------------------- |
+| `undervoltage_occurred`    |  16 | Undervoltage has occurred since boot               |
+| `arm_freq_capped_occurred` |  17 | ARM-frequency capping has occurred since boot      |
+| `throttled_occurred`       |  18 | Throttling has occurred since boot                 |
+| `soft_temp_limit_occurred` |  19 | The soft temperature limit has occurred since boot |
+
+Historical flags remain set until the Raspberry Pi is rebooted.
+
+Decoded flag values are:
+
+```text
+0  flag not set
+1  flag set
+nd value unavailable
+```
+
+---
+
+## ARM Clock
+
+The ARM clock is read with:
+
+```bash
+vcgencmd measure_clock arm
+```
+
+The result is converted from hertz to megahertz and recorded as:
+
+```text
+arm_clock_mhz=<value>
+```
+
+If the returned value is unavailable or non-numeric:
+
+```text
+arm_clock_mhz=nd
+```
+
+---
+
+## Metadata Integration
+
+Each captured image receives the same health information in the `[system_health]` section of its `.meta` sidecar:
+
+```text
+[system_health]
+soc_temp_c=<value>
+throttled_hex=<value>
+arm_clock_mhz=<value>
+undervoltage_now=<0|1|nd>
+arm_freq_capped_now=<0|1|nd>
+throttled_now=<0|1|nd>
+soft_temp_limit_now=<0|1|nd>
+undervoltage_occurred=<0|1|nd>
+arm_freq_capped_occurred=<0|1|nd>
+throttled_occurred=<0|1|nd>
+soft_temp_limit_occurred=<0|1|nd>
+```
+
+Health values are collected after image acquisition, while the metadata sidecar is being generated.
+
+For the complete sidecar structure, see [Metadata](METADATA.md).
+
+---
+
+[Operations](OPERATIONS.md) · [Back to the project README](../../README.md)
