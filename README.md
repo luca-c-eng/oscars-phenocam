@@ -1,7 +1,7 @@
 # oscars-phenocam
 
 [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](software/VERSION)
+[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](software/VERSION)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18800314.svg)](https://doi.org/10.5281/zenodo.18800314)
 
 **Open and FAIR Integrated Phenology Monitoring System — PhenoCam Software**
