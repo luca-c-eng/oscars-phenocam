@@ -1,111 +1,80 @@
 # Changelog
 
-All notable, code-verifiable changes to OSCARS-PHENOCAM are documented in this file.
+Code changes between OSCARS-PHENOCAM versions `1.3.0` and `dev/v1.7.0`.
 
 ## [dev/v1.7.0]
 
 ### Changed
 
-* Station time is derived from `UTC_OFFSET` and uses a fixed UTC offset without daylight-saving-time changes.
-* The default network interface is `auto` instead of a board-specific interface.
-* Automatic network selection uses the interface associated with the default route, with a fallback to the first non-loopback interface having a global IPv4 address.
-* Metadata collection uses the same network-interface resolution logic as the uploader.
-* The capture timer explicitly runs at minutes `00` and `30` of every hour in UTC.
-* The installer checks protected configuration files through `sudo` and obtains the installed commit through `sudo git`.
-* The default `settings.txt` template uses `UTC+1` as its timezone label and `auto` as its interface.
+* `UTC_OFFSET` configures a fixed station timezone without daylight-saving-time changes.
+* `TZ` and `TZ_LABEL` are generated from `UTC_OFFSET`.
+* The default network interface is `auto`.
+* An explicit `IFACE` is used when the interface exists.
+* With `NET_MODE=auto`, network selection prefers the interface used by the default route and then the first non-loopback interface with a global IPv4 address.
+* Metadata uses the same interface-resolution functions as the upload subsystem.
+* `phenocam-capture.timer` runs at minutes `00` and `30` of every hour in UTC.
+* The installer no longer derives the network interface from the Raspberry Pi model.
 
 ## [dev/v1.6.0]
 
 ### Added
 
-* Startup test cycle implemented by:
-
-  * `phenocam-startup-cycle.sh`
-  * `phenocam-startup-cycle.service`
-  * `phenocam-startup-cycle.timer`
-* The startup timer runs once, two minutes after boot.
-* The startup cycle performs one capture followed by one upload attempt.
-* Runtime version information is installed in `/usr/local/lib/phenocam/VERSION`.
-* Installation information is written to `/usr/local/lib/phenocam/BUILD_INFO`.
-* Metadata includes a `[phenocam]` section containing software version, branch, commit and installation timestamp.
+* `phenocam-startup-cycle.sh`, which runs one capture followed by one upload request.
+* `phenocam-startup-cycle.service`.
+* `phenocam-startup-cycle.timer`, scheduled two minutes after boot.
+* Runtime version file at `/usr/local/lib/phenocam/VERSION`.
+* Runtime installation information at `/usr/local/lib/phenocam/BUILD_INFO`.
+* A `[phenocam]` metadata section containing software name, version, branch, commit and installation timestamp.
 
 ### Changed
 
-* The installer enables the startup-cycle timer together with the regular capture and upload timers.
-* `PHENOCAM_DISABLE_TIMERS=1` disables all three timers.
+* The installer enables or disables the startup-cycle timer together with the capture and upload timers.
 
 ## [1.5.0]
 
 ### Added
 
-* Raspberry Pi system-health collection through `system_health.sh`.
-* The following values are collected:
+* `system_health.sh` for collecting:
 
   * SoC temperature;
   * ARM clock frequency;
-  * current undervoltage and throttling flags;
+  * current throttling and undervoltage flags;
   * throttling and undervoltage events recorded since boot.
-* Captured-image metadata includes a `[system_health]` section.
-* `diag_system_health.sh` provides direct command-line access to the collected health values.
+* A `[system_health]` section in each generated metadata file.
+* `diag_system_health.sh` for displaying the collected system-health values.
 
 ## [1.4.0]
 
 ### Added
 
-* Dynamic RAM-backed storage initialization through `phenocam-init-ramdisk.sh`.
-* RAM-disk size is calculated as 20% of total memory, with a minimum of 50 MB.
-* The RAM-disk mount uses the numeric user and group identifiers of the `phenocam` account.
-* Existing queued image or metadata files prevent an automatic RAM-disk restart.
-* Camera capture is protected by an operating-system timeout.
-* `CAPTURE_TIMEOUT` controls the camera warm-up timeout and defaults to `30000` milliseconds.
-* `BOARD`, `CAMERA_MODEL` and `CAPTURE_TIMEOUT` are read and exported from `settings.txt`.
+* `phenocam-init-ramdisk.sh` for preparing `/run/phenocam`.
+* RAM-disk sizing equal to 20% of total system memory, with a minimum of 50 MB.
+* RAM-disk ownership based on the numeric UID and GID of the `phenocam` user.
+* Protection against restarting an active RAM-disk mount when queued `.jpg` or `.meta` files are present.
+* An operating-system timeout around the camera command.
+* `BOARD`, `CAMERA_MODEL` and `CAPTURE_TIMEOUT` fields in the settings parser.
 
 ### Changed
 
-* Only `CAPTURE_TIMEOUT` is consumed by the capture implementation; `CAMERA_MODEL` is not used to select capture behaviour.
 * Camera capture runs without a preview window.
-* FTP configuration requires a numeric port.
-* FTP transfers use passive mode, connection and transfer timeouts, and retry parameters.
-* SFTP and FTP activation is based on effective configuration content rather than file size alone.
-* When both upload protocols are enabled, each pair is removed only after both upload attempts succeed.
+* `CAPTURE_TIMEOUT` is passed to the camera command and defaults to `30000` milliseconds.
+* `BOARD` and `CAMERA_MODEL` are exported but are not consumed by the runtime capture scripts.
+* Carriage-return characters are removed when reading settings and FTP credentials.
+* FTP ports must contain only digits.
+* FTP transfers use passive mode, connection and transfer timeouts, and retries.
+* SFTP and FTP activation depends on effective configuration content.
+* When both protocols are enabled, a local image and metadata pair is removed only if both upload attempts succeed.
 * Capture and upload services require the initialization service and RAM-disk mount.
-* The initialization service prepares the RAM disk and no longer launches a capture-and-upload cycle.
-* Production timers are enabled for the next boot but are not started immediately by the installer.
-* Existing configuration files are preserved during installation.
+* The initialization service prepares the RAM disk and does not run a capture-and-upload cycle.
 
 ## [1.3.1]
 
 ### Changed
 
-* The installer creates an empty FTP credentials file instead of placeholder credentials.
-* Blank and comment-only lines are excluded while reading `settings.txt`.
-* SFTP is enabled only when `server.txt` contains at least one non-empty, non-comment line.
-* Comment-only SFTP configuration no longer activates an upload attempt.
+* The installer creates an empty `ftp_credentials.txt` instead of inserting placeholder credentials.
+* SFTP is enabled only when `server.txt` contains a non-empty, non-comment line.
 
 ## [1.3.0]
 
-### Added
+Initial comparison baseline for this changelog.
 
-* `REMOTE_LAYOUT` configuration with `general` and `icos` remote directory layouts.
-* Station metadata fields for latitude, longitude, elevation, monitoring start date, monitoring end date and image count.
-* A `[system]` metadata section.
-* `datetime_original` as an alias of the acquisition timestamp.
-* Log rotation for `/var/log/phenocam/phenocam.log`:
-
-  * rotation at 1 MB;
-  * seven retained archives;
-  * compression of rotated logs.
-
-### Changed
-
-* Image names use `<SITENAME>_<timestamp>` and no longer include the hostname.
-* FTP and SFTP remote paths are generated from `REMOTE_LAYOUT`.
-* In `general` layout, files are grouped by station, year and month.
-* In `icos` layout, files are placed below `data/<SITENAME>`.
-* Local image and metadata pairs are retained until the last enabled upload protocol succeeds.
-* SD-card usage is checked only when the queue must fall back from RAM or USB storage to the SD card.
-* Capture-window hour values are converted explicitly to base-10 integers.
-
-## [1.2.2]
-
-This is the earliest tagged code snapshot used as the comparison baseline.
