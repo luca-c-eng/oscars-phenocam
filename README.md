@@ -112,6 +112,7 @@ The sidecar records station and network information, acquisition time, software 
 * [Metadata format](software/docs/METADATA.md)
 * [System health and thermal monitoring](software/docs/THERMAL_MONITORING.md)
 * [Changelog](software/CHANGELOG.md)
+* [Software architecture](software/docs/ARCHITECTURE.md)
 
 ---
 
