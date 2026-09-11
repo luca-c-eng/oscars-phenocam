@@ -1,4 +1,4 @@
-# oscars-phenocam
+# OSCARS-PHENOCAM
 
 [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](software/VERSION)
