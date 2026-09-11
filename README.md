@@ -77,7 +77,7 @@ The primary queue is stored in `/run/phenocam/queue` on a dynamically sized RAM-
 
 When available RAM space is below `RAM_MIN_FREE_MB`, the pair is redirected to the first available writable USB queue whose usage is below `USB_MAX_USED_PCT`.
 
-If a suitable USB queue is unavailable, the SD-card queue is used. When SD fallback is required and SD usage is at or above `SD_MAX_USED_PCT`, the pair is not queued and the capture cycle fails.
+If a suitable USB queue is unavailable, the SD-card queue is used. When SD fallback is required and SD usage is at or above `SD_MAX_USED_PCT`, If a suitable USB queue is unavailable, the SD-card queue is used. If SD fallback is required and SD usage is at or above `SD_MAX_USED_PCT`, the captured JPEG and metadata files are removed from staging and the cycle completes without queuing the pair.
 
 The upload service processes queues in this order:
 
