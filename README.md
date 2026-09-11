@@ -1,10 +1,15 @@
-# OSCARS-PHENOCAM
+# oscars-phenocam
+
+[![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](software/VERSION)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18800314.svg)](https://doi.org/10.5281/zenodo.18800314)
 
 **Open and FAIR Integrated Phenology Monitoring System — PhenoCam Software**
 
-OSCARS-PHENOCAM is a Raspberry Pi-based software system for automated visible-light image acquisition, metadata generation, local queue management, and remote data transfer.
+Raspberry Pi-based phenological camera system for automated image acquisition and upload.  
+Part of the [OSCARS](https://oscars-project.eu/projects/open-and-fair-integrated-phenology-monitoring-system) Open Science project (EU grant 101129751).
 
-This documentation describes the `dev/v1.7.0` software line.
+---
 
 ---
 
