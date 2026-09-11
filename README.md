@@ -114,6 +114,8 @@ The sidecar records station and network information, acquisition time, software 
 * [Changelog](software/CHANGELOG.md)
 * [Software architecture](software/docs/ARCHITECTURE.md)
 
+
+
 ---
 
 ## License
