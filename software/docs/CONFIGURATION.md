@@ -93,7 +93,7 @@ imx708
 |   22 | `CAMERA_MODEL`     | `imx708`              | Read and exported, but not used after configuration loading  |
 |   23 | `CAPTURE_TIMEOUT`  | `30000`               | Camera warm-up time in milliseconds                          |
 
-The first six effective values are mandatory. The remaining values use internal fallbacks when omitted.
+The first five effective values are mandatory. The remaining values use internal fallbacks when omitted.
 
 ---
 
