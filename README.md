@@ -1,4 +1,4 @@
-# OSCARS-Phenocam
+# OSCARS-PHENOCAM
 [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](software/VERSION)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18800314.svg)](https://doi.org/10.5281/zenodo.18800314)
@@ -10,21 +10,20 @@ Part of the [OSCARS](https://oscars-project.eu/projects/open-and-fair-integrated
 
 ---
 
----
-
 ## Overview
 
-The software operates as an autonomous acquisition pipeline managed by `systemd`.
+The software operates as an autonomous acquisition and transfer pipeline managed by `systemd`.
 
-At each scheduled capture cycle, it:
+During each scheduled capture cycle, it:
 
 1. verifies that the current station time is inside the configured acquisition window;
 2. captures a JPEG image;
 3. generates the corresponding `.meta` sidecar;
-4. stores the pair in the available queue;
-5. transfers queued pairs through the configured upload protocols.
+4. stores the image and metadata pair in the selected queue.
 
-Capture and upload are handled by separate services and timers.
+A separate upload service periodically processes the queued pairs and transfers them through the configured upload protocols.
+
+Capture and upload therefore operate independently through dedicated services and timers.
 
 ---
 
