@@ -1,18 +1,19 @@
 # OSCARS-PHENOCAM
+
 [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](software/VERSION)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18800314.svg)](https://doi.org/10.5281/zenodo.18800314)
 
 **Open and FAIR Integrated Phenology Monitoring System — PhenoCam Software**
 
-Raspberry Pi-based phenological camera system for automated image acquisition and upload.  
+Raspberry Pi-based phenological camera system for automated image acquisition and upload.
 Part of the [OSCARS](https://oscars-project.eu/projects/open-and-fair-integrated-phenology-monitoring-system) Open Science project (EU grant 101129751).
 
 ---
 
 ## Overview
 
-The software operates as an autonomous acquisition and transfer pipeline managed by `systemd`.
+OSCARS-PHENOCAM operates as an autonomous acquisition and transfer pipeline managed by `systemd`.
 
 During each scheduled capture cycle, it:
 
@@ -21,17 +22,17 @@ During each scheduled capture cycle, it:
 3. generates the corresponding `.meta` sidecar;
 4. stores the image and metadata pair in the selected queue.
 
-A separate upload service periodically processes the queued pairs and transfers them through the configured upload protocols.
+A separate upload service periodically processes queued pairs using the configured upload protocols.
 
-Capture and upload therefore operate independently through dedicated services and timers.
+Capture and upload use independent services, timers and lock files.
 
 ---
 
 ## Core Features
 
-* Visible-light image capture through `rpicam-still`, with `libcamera-still` fallback
+* JPEG image capture through `rpicam-still`, with `libcamera-still` fallback
 
-* Scheduled captures at `:00` and `:30` of every hour
+* Capture timer scheduled at minutes `00` and `30` of every hour in UTC
 
 * Configurable daily acquisition window using a fixed UTC offset
 
@@ -44,47 +45,47 @@ Capture and upload therefore operate independently through dedicated services an
 
 * One structured `.meta` sidecar for every JPEG image
 
-* Software version, build, system-health, network, capture, and EXIF metadata
+* Software, system-health, network, capture and EXIF metadata
 
 * Three-level storage queue:
 
   ```text
-  RAMDISK → USB → SD card
+  RAM → USB → SD
   ```
 
-* Automatic queue retention when uploads fail
+* Retention of queued pairs when an enabled upload fails
 
 * FTP and SFTP support
 
-* Simultaneous FTP and SFTP operation when both are configured
+* FTP and SFTP operation within the same upload cycle when both are configured
 
 * Multiple SFTP destination support
 
 * USB hot-plug handling
 
-* Raspberry Pi temperature, throttling, and undervoltage monitoring
+* Raspberry Pi temperature, throttling and undervoltage monitoring
 
-* Dedicated runtime user, file locking, atomic queue writes, and hardened `systemd` services
+* Startup capture-and-upload test cycle
 
-* Automatic capture-and-upload test cycle after boot
+* Dedicated runtime user, file locking, temporary queue filenames and hardened `systemd` services
 
 ---
 
 ## Runtime Flow
 
-The primary queue is stored in `/run/phenocam`, on a dynamically sized RAM-backed filesystem.
+The primary queue is stored in `/run/phenocam/queue` on a dynamically sized RAM-backed filesystem.
 
-When the configured minimum RAM space is unavailable, image and metadata pairs are redirected to a writable USB queue. If USB storage is unavailable or above its configured usage threshold, the SD-card queue is used.
+When available RAM space is below `RAM_MIN_FREE_MB`, the pair is redirected to the first available writable USB queue whose usage is below `USB_MAX_USED_PCT`.
 
-If the SD-card usage threshold is reached, the capture is skipped.
+If a suitable USB queue is unavailable, the SD-card queue is used. When SD fallback is required and SD usage is at or above `SD_MAX_USED_PCT`, the pair is not queued and the capture cycle fails.
 
-The upload service drains queues in the following order:
+The upload service processes queues in this order:
 
-1. USB queue
-2. SD-card queue
-3. RAM queue
+1. USB
+2. SD
+3. RAM
 
-A local image and metadata pair is removed only after all enabled upload targets complete successfully.
+When both FTP and SFTP are configured, both transfers are attempted for each pair. Local files are removed only after every enabled upload succeeds.
 
 ---
 
@@ -100,20 +101,20 @@ Each `.meta` file contains:
 [exif]
 ```
 
-The sidecar records station and network information, acquisition time, software version and build, Raspberry Pi health data, fixed capture parameters, and the complete EXIF output extracted from the JPEG.
+The sidecar stores station and network information, acquisition time, installed software information, Raspberry Pi health values, fixed capture parameters and the EXIF data returned by `exiftool`.
 
 ---
 
 ## Documentation
 
-* [Installation](software/docs/CLEAN_INSTALL.md)
+* [Clean installation](software/docs/CLEAN_INSTALL.md)
 * [Configuration](software/docs/CONFIGURATION.md)
+* [Software architecture](software/docs/ARCHITECTURE.md)
 * [Operations](software/docs/OPERATIONS.md)
 * [Metadata format](software/docs/METADATA.md)
 * [System health and thermal monitoring](software/docs/THERMAL_MONITORING.md)
-* [Changelog](software/CHANGELOG.md)
-* [Software architecture](software/docs/ARCHITECTURE.md)
 * [Troubleshooting](software/docs/TROUBLESHOOTING.md)
+* [Changelog](software/CHANGELOG.md)
 
 ---
 
