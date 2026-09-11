@@ -1,205 +1,207 @@
-# PhenoCam Changelog
+# Changelog
 
-All significant changes to this project are documented in this file.
-Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
+This file records notable OSCARS-PHENOCAM software changes reconstructed from the Git history and executable code.
+
+Dates correspond to version-marker or installer-branch transitions. No Git tags are currently present in the repository.
+
+Documentation-only changes are not included.
 
 ---
-## dev/v1.6.0
+
+## `dev/v1.7.0` — 2026-08-26
 
 ### Added
-- Added startup test cycle after boot:
-  - `phenocam-startup-cycle.timer`
-  - `phenocam-startup-cycle.service`
-  - `phenocam-startup-cycle.sh`
-- Added PhenoCam software version/build metadata in every `.meta` file through a new `[phenocam]` section.
-- Added runtime build files:
-  - `/usr/local/lib/phenocam/VERSION`
-  - `/usr/local/lib/phenocam/BUILD_INFO`
+
+* Fixed station-time configuration derived from `UTC_OFFSET`.
+* Support for signed UTC offsets, including optional minute components.
+* Shared network-interface resolution through `net_check.sh`.
 
 ### Changed
-- Installer now enables startup-cycle, capture and upload timers for boot by default.
-- Installer final report now includes health diagnostics and build/version inspection commands.
-- Metadata now distinguishes Raspberry Pi camera EXIF software from the PhenoCam software release.
 
-### Notes
-- The EXIF field `Software=rpicam-apps` refers to the Raspberry Pi camera stack.
-- The new `[phenocam]` metadata section identifies the oscars-phenocam software version and Git commit that produced the image.
+* Set the default network interface to `auto`.
 
-## [1.4.0] — 2026-07-07
+* Removed the association between Raspberry Pi model and network-interface selection.
 
-### Fixed after Zero 2 W validation (2026-07-08)
-- `run-phenocam.mount`: RAMDISK ownership is now made persistent through uid/gid-aware mount options written by `phenocam-init-ramdisk.sh`.
-- `phenocam-init.service`: removed fragile inline Bash RAMDISK calculation; runtime setup is delegated to `bin/phenocam-init-ramdisk.sh`.
-- `phenocam-capture.service`: added `TimeoutStartSec=300` because Zero 2W captures can legitimately exceed 30 seconds end-to-end.
-- `capture_vis.sh`: added headless `-n` capture mode and a wider GNU `timeout` guard. `CAPTURE_TIMEOUT` remains the rpicam warm-up time, not the OS guard.
-- `install.sh`: fixed board auto-detection write to settings line 21; no literal `${DETECTED_BOARD:-unknown}` is written anymore.
-- `install.sh`: production timers are not started by default until settings and upload credentials are configured.
-- `uploader_daemon.sh`: SFTP is enabled only when `server.txt` has effective non-comment content.
-- `uploader_daemon.sh`: FTP is enabled only when `ftp_credentials.txt` has five effective credential fields.
-- `uploader_daemon.sh`: if both SFTP and FTP are configured, local files are removed only after all configured targets succeed.
-- `upload_ftp.sh`: FTP port is fully configurable; FTP on port 22 remains `ftp://host:22/...` and is not converted to SFTP.
+* Network selection now follows this priority:
 
-### Documentation
-- Added `README.md` and structured docs under `software/docs/` for clean install, configuration, operations, and v1.4.0 development notes.
+  1. configured interface;
+  2. configured Ethernet or Wi-Fi mode;
+  3. interface selected by the default route;
+  4. first non-loopback interface with a global IPv4 address.
 
+* Metadata generation now uses the shared network resolver.
+
+* Capture scheduling now explicitly uses UTC:
+
+  ```ini
+  OnCalendar=*-*-* *:00,30:00 UTC
+  ```
+
+* Updated installer repository and version references to `dev/v1.7.0`.
+
+### Fixed
+
+* Configuration-file existence checks now use `sudo test`.
+* SSH-key existence checks now work with protected configuration directories.
+* Installed Git commit detection now runs with the permissions required for `/opt/oscars-phenocam`.
+* Corrected creation of the default `settings.txt`.
+
+---
+
+## `dev/v1.6.0` — 2026-07-10
 
 ### Added
-- Multi-hardware support via `settings.txt` configuration (no separate branches):
-  - `BOARD` (field 21): `rpi3b+` | `rpizero2w` | `unknown`
-    Auto-detected from `/proc/cpuinfo` by `install.sh` at install time.
-  - `CAMERA_MODEL` (field 22): `imx708` (Camera Module 3) | `imx708_noir` (V3 NoIR)
-    Set manually after installation.
-  - `CAPTURE_TIMEOUT` (field 23): rpicam-still timeout in ms (default 30000).
-    Same value is safe on both boards; has no effect on image quality.
 
-- `capture_vis.sh`: added `--timeout` flag using `CAPTURE_TIMEOUT` variable.
-  Prevents the ISP from being cut off on slower boards (Zero 2W) before
-  exposure and white balance have stabilised.
+* Startup capture-and-upload script.
 
-- Dynamic RAMDISK sizing in `phenocam-init.service`:
-  - Calculates 20% of total RAM at boot, with a minimum of 50 MB.
-  - Writes the result into `run-phenocam.mount` before (re)starting the mount.
-  - RPi 3B+ (1024 MB): ~204 MB RAMDISK
-  - RPi Zero 2W (512 MB): ~102 MB RAMDISK
-  - Replaces the previous hardcoded 200 MB value.
+* Dedicated startup-cycle `systemd` service.
 
-- `install.sh`: auto-detects board model from `/proc/cpuinfo` and writes
-  the `BOARD` field into `settings.txt` (line 21) automatically.
+* Timer that requests the startup cycle approximately two minutes after boot.
+
+* Runtime `VERSION` installation.
+
+* Runtime `BUILD_INFO` containing:
+
+  * software name;
+  * version;
+  * branch;
+  * Git commit;
+  * installation timestamp.
+
+* `[phenocam]` section in each `.meta` sidecar.
+
+* Fallback metadata when `BUILD_INFO` is unavailable.
 
 ### Changed
-- `config_read.sh`: added fields 21 (`BOARD`), 22 (`CAMERA_MODEL`),
-  23 (`CAPTURE_TIMEOUT`).
-- `VERSIONS.txt`: documents all four supported hardware combinations
-  (2 boards × 2 cameras). RPi Zero 2W kernel to be filled after first
-  verified installation.
+
+* Installer timer management now includes the startup-cycle timer.
+* Installation summary now reports system health and build-information commands.
 
 ---
 
-## [1.3.0] — 2026-04-01
+## `dev/v1.5.0` — 2026-07-09
 
 ### Added
-- Site metadata fields in `settings.txt` (fields 15–20):
-  `SITE_LAT`, `SITE_LON`, `SITE_ELEV_M`, `SITE_START_DATE`,
-  `SITE_END_DATE`, `SITE_NIMAGE` — all default to `nd` (not defined).
-- `REMOTE_LAYOUT` field (field 14): `general` | `icos` — selects the
-  remote directory structure for upload (PhenoCam general network or
-  ICOS Europe network).
-- `logrotate` configuration: `config/phenocam.logrotate` — weekly rotation,
-  4 weeks history, compression, copytruncate (no service restart required).
-  Installed to `/etc/logrotate.d/phenocam` by `install.sh`.
-- `install.sh`: installs logrotate configuration automatically.
-- SSH key permissions aligned for phenocam user (600 private, 644 public).
-- SFTP setup instructions added to the final report in `install.sh`.
 
-### Changed
-- `settings.txt` expanded from 13 to 20 fields (backward compatible —
-  missing fields default gracefully).
+* Raspberry Pi system-health module.
+* SoC temperature acquisition.
+* ARM clock-frequency acquisition.
+* Current and historical undervoltage and throttling decoding.
+* `[system_health]` section in each `.meta` sidecar.
+* `diag_system_health.sh` diagnostic command.
+* Health scripts to the installer’s critical-file verification.
+
+### Historical Note
+
+The installer branch was changed to `dev/v1.5.0`, but `software/VERSION` remained at `1.4.0`. The version marker was subsequently changed directly to `1.6.0`.
 
 ---
 
-## [1.2.2] — 2026-03-19
-
-### Bugfix
-- `meta_build.sh`: removed erroneous `_fixed` suffix on the `ev` line
-  inside the `[capture_params_fixed]` section.
-
----
-
-## [1.2.1] — 2026-03-19
-
-### Bugfix
-- `phenocam-init.service`: `phenocam-run.sh` is now executed via
-  `runuser -u phenocam` instead of root. This ensures all files created
-  at boot (capture.lock, upload.lock, phenocam.log) are immediately owned
-  by `phenocam:phenocam`, eliminating the need for subsequent chown calls.
-  Fixes: 'Permission denied' on capture.lock and phenocam.log after
-  a fresh installation.
-
----
-
-## [1.2.0] — 2026-03-18
+## `1.4.0` — 2026-07-07
 
 ### Added
-- USB hot-plug support via udev:
-  - `bin/phenocam-usb-attach.sh`: on plug-in, creates the queue directory
-    and logs the event
-  - `bin/phenocam-usb-detach.sh`: on removal, performs lazy unmount,
-    cleans up orphan .tmp files, logs the event
-  - `systemd/99-phenocam-usb.rules`: udev rule (requires FAT32,
-    install in /etc/udev/rules.d/)
-- Configurable USB usage threshold: new field 13 in settings.txt
-  `USB_MAX_USED_PCT` (default 90%). If USB exceeds the threshold,
-  the system spills over to SD instead of blocking.
-- Orphan .tmp file cleanup: new function `cleanup_tmp_orphans()`
-  in storage_manager.sh
-- New helper function `usb_is_mounted()` in storage_manager.sh
+
+* Positional configuration records for:
+
+  * `BOARD`;
+  * `CAMERA_MODEL`;
+  * `CAPTURE_TIMEOUT`.
+
+* Camera warm-up timeout support.
+
+* Operating-system timeout guard around the camera command.
+
+* Dynamic RAM-disk initialization through `phenocam-init-ramdisk.sh`.
+
+* RAM-disk sizing based on 20% of total memory, with a 50 MB minimum.
+
+* Automatic Raspberry Pi board detection during installation.
 
 ### Changed
-- `config_read.sh`: added field 13 `USB_MAX_USED_PCT`
-- `queue_manager.sh`: checks USB threshold before using it as spillover
-- `settings_example.txt`: added field 13 with comment
+
+* Moved RAM-disk preparation from inline service logic to a dedicated script.
+* Updated capture and upload service dependencies on initialization and the RAM mount.
+* Increased service execution timeouts.
+* Improved positional configuration parsing for comments, empty lines, and CRLF input.
+* Improved effective FTP and SFTP configuration detection.
+* Updated FTP credential parsing and validation.
+* Changed local-pair deletion so it occurs only after every enabled upload protocol succeeds.
+* Improved installer privilege checks, camera checks, timer setup, and deployment verification.
+
+### Current Behaviour of New Fields
+
+`BOARD` and `CAMERA_MODEL` are loaded and exported but do not alter runtime behaviour in the current code.
 
 ---
 
-## [1.1.0] — 2026-03-18
+## `1.3.0` — 2026-03-30
+
+### Added
+
+* `REMOTE_LAYOUT` configuration with `general` and `icos` layouts.
+
+* Site metadata fields:
+
+  * latitude;
+  * longitude;
+  * elevation;
+  * site start date;
+  * site end date;
+  * image value.
+
+* `datetime_original` metadata alias.
+
+* `network` metadata field containing the selected remote layout.
+
+* Log rotation for `/var/log/phenocam/phenocam.log`.
+
+* FTP and SFTP remote-directory creation for both supported layouts.
 
 ### Changed
-- File naming now uses underscores throughout:
-  `mysite_phenocam01_2026_03_18_133005.jpg`
-  (hostname always lowercase, date with underscores instead of hyphens)
-- Enriched metadata: added `[capture_params_fixed]` section with all fixed
-  capture parameters (width, height, awb, gain, sharpness, contrast,
-  brightness, saturation, denoise, ev, lens_position, quality)
-- exiftool now uses `-a -u -g1` to extract all available tags including
-  non-standard Camera Module 3 tags
-- Automatic capture+upload cycle on first boot: `phenocam-init.service`
-  now runs `phenocam-run.sh` after the RAMDISK chown
-- `phenocam-init.service` now waits for `network-online.target` before
-  running the initial cycle
+
+* Simplified filenames by removing the hostname:
+
+  ```text
+  SITENAME_YYYY_MM_DD_HHMMSS
+  ```
+
+* Changed the general remote layout to:
+
+  ```text
+  SITENAME/YYYY/MM/
+  ```
+
+* Added the ICOS layout:
+
+  ```text
+  data/SITENAME/
+  ```
+
+* Changed SD-capacity evaluation so it is applied when SD fallback is required.
+
+* Improved numeric handling of capture-window hours.
+
+* Updated the capture schedule to minutes `00` and `30`.
+
+* Updated SFTP-key ownership and `known_hosts` creation.
+
+* Changed the project license to BSD 3-Clause.
 
 ---
 
-## [1.0.0] — 2026-03-18
+## `1.2.2` — 2026-03-20
 
-First stable release. Tested and verified on Phenocam01, Phenocam02, Phenocam03.
+### Initial Release
 
-### Features
-- Periodic image acquisition with rpicam-still (Camera Module 3)
-- Metadata file (.meta) with EXIF data + network info (IP, MAC, interface)
-- 3-level queue: RAMDISK (200MB tmpfs) → USB → SD card
-- FTP upload via curl (user+password, passive mode, date-based subfolders)
-- SFTP upload with ed25519 SSH key (infrastructure ready, server TBD)
-- systemd timers: capture at :00 and :30 every hour, upload every 9 minutes
-- Automatic startup at boot via systemd
-- systemd security hardening (NoNewPrivileges, ProtectSystem,
-  MemoryDenyWriteExecute)
-- Diagnostic scripts: diag_camera.sh, diag_net.sh, diag_ramdisk.sh,
-  diag_upload.sh
-
-### Bugs fixed (compared to development versions)
-- Windows CRLF in scripts caused "invalid option name: pipefail"
-- `$0` instead of `${BASH_SOURCE[0]}` in cycle.sh caused
-  "No such file or directory"
-- `/etc/phenocam/` with root group prevented phenocam from reading files
-- phenocam user not in video group caused "Permission denied" on /dev/media*
-- Missing `source upload_ftp.sh` in phenocam-upload.sh caused
-  "command not found"
-- `chown /run/phenocam` did not persist across reboots —
-  fixed with phenocam-init.service
-- Merged lines in settings.txt (e.g. `80/media:/mnt`) caused
-  "unbound variable"
-- Trailing space in ftp_credentials.txt caused "URL bad/illegal format"
-- Orphan files in staging were never removed — added automatic cleanup
+* Automated visible-image acquisition.
+* Per-image `.meta` sidecar generation.
+* Scheduled capture and upload through `systemd`.
+* RAM, USB, and SD storage queues.
+* FTP and SFTP upload support.
+* USB insertion and removal handlers.
+* Camera, network, RAM-disk, and upload diagnostics.
+* Automated installer and runtime deployment.
 
 ---
 
----
-
-### Added in v1.5.0
-- Added Raspberry Pi system health metadata in `.meta` files:
-  - SoC temperature in Celsius
-  - `vcgencmd get_throttled` raw bitmask
-  - decoded undervoltage/throttling/soft-temperature flags
-  - ARM clock frequency
-- Added `diag_system_health.sh` for manual thermal and throttling diagnostics.
-- Added thermal monitoring documentation.
+[Back to the project README](../README.md)
