@@ -1,27 +1,35 @@
 # Configuration
 
-OSCARS-PHENOCAM configuration files are stored in:
+OSCARS-PHENOCAM reads its runtime configuration from:
 
 ```text
 /etc/phenocam/
 ```
 
-They are created during installation and are not overwritten when the installer is run again.
+The installer creates the configuration files only when they do not already exist.
 
 ---
 
 ## Configuration Files
 
-| File                    | Purpose                                                       |
-| ----------------------- | ------------------------------------------------------------- |
-| `settings.txt`          | Station, acquisition, storage, network, and metadata settings |
-| `server.txt`            | SFTP destination hosts                                        |
-| `ftp_credentials.txt`   | FTP connection parameters                                     |
-| `known_hosts`           | Trusted SFTP server fingerprints                              |
-| `keys/phenocam_key`     | SFTP private key                                              |
-| `keys/phenocam_key.pub` | SFTP public key                                               |
+| Path                    | Purpose                                                      |
+| ----------------------- | ------------------------------------------------------------ |
+| `settings.txt`          | Station, acquisition, storage, network and metadata settings |
+| `server.txt`            | SFTP destination hosts                                       |
+| `ftp_credentials.txt`   | FTP connection parameters                                    |
+| `known_hosts`           | Trusted SFTP server fingerprints                             |
+| `keys/phenocam_key`     | SFTP private key                                             |
+| `keys/phenocam_key.pub` | SFTP public key                                              |
 
-Configuration files are owned by `root:phenocam`. Edit them using `sudo`.
+The installer applies these permissions:
+
+| Files                                                              | Owner               |  Mode |
+| ------------------------------------------------------------------ | ------------------- | ----: |
+| `settings.txt`, `server.txt`, `ftp_credentials.txt`, `known_hosts` | `root:phenocam`     | `640` |
+| `keys/phenocam_key`                                                | `phenocam:phenocam` | `600` |
+| `keys/phenocam_key.pub`                                            | `phenocam:phenocam` | `644` |
+
+Edit protected files using `sudo`.
 
 ---
 
@@ -33,9 +41,9 @@ Edit:
 sudo nano /etc/phenocam/settings.txt
 ```
 
-The file uses a positional format: one value per line.
+The file uses a positional format with one effective value per line.
 
-Empty lines and lines beginning with `#` are ignored. Therefore, the positions below refer to non-empty, non-comment lines.
+Blank lines and comment lines are removed before positions are assigned. A blank line therefore cannot represent an empty field, and the order of the values must not change.
 
 The installer creates:
 
@@ -65,35 +73,37 @@ imx708
 30000
 ```
 
-### Settings Reference
+## Settings Reference
 
-| Pos. | Variable           | Initial value         | Effective behaviour                                          |
-| ---: | ------------------ | --------------------- | ------------------------------------------------------------ |
-|    1 | `SITENAME`         | `mysite`              | Used in filenames, metadata, and remote paths                |
-|    2 | `UTC_OFFSET`       | `+1`                  | Sets the fixed station time offset                           |
-|    3 | `TZ_LABEL`         | `UTC+1`               | Read from the file, then regenerated from `UTC_OFFSET`       |
-|    4 | `START_HOUR`       | `6`                   | Start of the capture window, inclusive                       |
-|    5 | `END_HOUR`         | `22`                  | End of the capture window, exclusive                         |
-|    6 | `INTERVAL_MIN`     | `30`                  | Read and exported, but not used in v1.7.0                    |
-|    7 | `IFACE`            | `auto`                | Explicit network interface or automatic selection            |
-|    8 | `SFTP_USER`        | `phenocam`            | Remote username used by SFTP                                 |
-|    9 | `NET_MODE`         | `auto`                | Network selection mode: `auto`, `ethernet`, or `wifi`        |
-|   10 | `RAM_MIN_FREE_MB`  | `20`                  | Minimum free RAM queue space before spillover                |
-|   11 | `SD_MAX_USED_PCT`  | `80`                  | SD usage threshold above which capture is skipped            |
-|   12 | `USB_MOUNT_BASES`  | `/media:/mnt`         | Colon-separated mount locations scanned for writable storage |
-|   13 | `USB_MAX_USED_PCT` | `90`                  | USB usage threshold before falling back to SD                |
-|   14 | `REMOTE_LAYOUT`    | `general`             | Remote directory layout: `general` or `icos`                 |
-|   15 | `SITE_LAT`         | `nd`                  | Latitude written to each `.meta` file                        |
-|   16 | `SITE_LON`         | `nd`                  | Longitude written to each `.meta` file                       |
-|   17 | `SITE_ELEV_M`      | `nd`                  | Elevation written to each `.meta` file                       |
-|   18 | `SITE_START_DATE`  | `nd`                  | Site start date written to each `.meta` file                 |
-|   19 | `SITE_END_DATE`    | `nd`                  | Site end date written to each `.meta` file                   |
-|   20 | `SITE_NIMAGE`      | `nd`                  | Value written as `nimage` in each `.meta` file               |
-|   21 | `BOARD`            | detected or `unknown` | Read and exported, but not used after configuration loading  |
-|   22 | `CAMERA_MODEL`     | `imx708`              | Read and exported, but not used after configuration loading  |
-|   23 | `CAPTURE_TIMEOUT`  | `30000`               | Camera warm-up time in milliseconds                          |
+| Pos. | Variable           | Initial value               | Effective behaviour                                                   |
+| ---: | ------------------ | --------------------------- | --------------------------------------------------------------------- |
+|    1 | `SITENAME`         | `mysite`                    | Used in filenames, metadata and remote paths                          |
+|    2 | `UTC_OFFSET`       | `+1`                        | Defines the fixed station time offset                                 |
+|    3 | `TZ_LABEL`         | `UTC+1`                     | Required by the positional parser, then regenerated from `UTC_OFFSET` |
+|    4 | `START_HOUR`       | `6`                         | Start of the acquisition window, inclusive                            |
+|    5 | `END_HOUR`         | `22`                        | End of the acquisition window, exclusive                              |
+|    6 | `INTERVAL_MIN`     | `30`                        | Read and exported, but not used by the capture timer                  |
+|    7 | `IFACE`            | `auto`                      | Explicit network interface or automatic selection                     |
+|    8 | `SFTP_USER`        | `phenocam`                  | Remote username used for SFTP                                         |
+|    9 | `NET_MODE`         | `auto`                      | Selects the `auto`, `ethernet` or `wifi` interface-resolution branch  |
+|   10 | `RAM_MIN_FREE_MB`  | `20`                        | RAM queue is used when its free space is at or above this value       |
+|   11 | `SD_MAX_USED_PCT`  | `80`                        | Applied only when SD fallback is required                             |
+|   12 | `USB_MOUNT_BASES`  | `/media:/mnt`               | Colon-separated locations scanned for writable mounted filesystems    |
+|   13 | `USB_MAX_USED_PCT` | `90`                        | USB is used only when its usage is below this value                   |
+|   14 | `REMOTE_LAYOUT`    | `general`                   | Remote directory layout: `general` or `icos`                          |
+|   15 | `SITE_LAT`         | `nd`                        | Written as `lat` in metadata                                          |
+|   16 | `SITE_LON`         | `nd`                        | Written as `lon` in metadata                                          |
+|   17 | `SITE_ELEV_M`      | `nd`                        | Written as `elev` in metadata                                         |
+|   18 | `SITE_START_DATE`  | `nd`                        | Written as `start_date` in metadata                                   |
+|   19 | `SITE_END_DATE`    | `nd`                        | Written as `end_date` in metadata                                     |
+|   20 | `SITE_NIMAGE`      | `nd`                        | Written as `nimage` in metadata                                       |
+|   21 | `BOARD`            | detected value or `unknown` | Read and exported, but not consumed by the runtime scripts            |
+|   22 | `CAMERA_MODEL`     | `imx708`                    | Read and exported, but not consumed by the runtime scripts            |
+|   23 | `CAPTURE_TIMEOUT`  | `30000`                     | Camera warm-up time in milliseconds                                   |
 
-The first five effective values are mandatory. The remaining values use internal fallbacks when omitted.
+The first six effective values are mandatory. Later values use internal defaults when they are absent.
+
+A non-numeric `CAPTURE_TIMEOUT` is replaced with `30000`.
 
 ---
 
@@ -101,13 +111,13 @@ The first five effective values are mandatory. The remaining values use internal
 
 `UTC_OFFSET` accepts:
 
-* `0`, `+0`, or `-0`;
-* signed offsets from `-14` to `+14`;
-* optional minute components such as `+5:30`.
+* `0`, `+0` or `-0`;
+* a signed hour from `-14` to `+14`;
+* an optional minute component between `00` and `59`, such as `+5:30`.
 
-The station uses a fixed UTC offset. Daylight-saving time is not applied.
+The software exports a fixed POSIX timezone from this value. Daylight-saving-time changes are not applied.
 
-`TZ_LABEL` is generated from `UTC_OFFSET`; changing line 3 independently has no runtime effect.
+`TZ_LABEL` is regenerated from `UTC_OFFSET`. Changing position 3 independently has no runtime effect, but the value must remain present because it is one of the six mandatory fields.
 
 The acquisition window is evaluated as:
 
@@ -122,31 +132,31 @@ START_HOUR = 6
 END_HOUR   = 22
 ```
 
-allows captures from hour `06` through hour `21`.
+allows acquisition from hour `06` through hour `21`.
 
-An acquisition window crossing midnight is not supported by the current comparison logic.
+The current comparison does not support a window that crosses midnight.
 
 ---
 
-## Capture Interval
+## Capture Schedule
 
-`INTERVAL_MIN` is currently read from line 6 but does not control the capture schedule.
+`INTERVAL_MIN` is read from position 6 but is not used to schedule captures.
 
-The effective schedule is defined by `phenocam-capture.timer`:
+The effective schedule is defined in `phenocam-capture.timer`:
 
 ```ini
 OnCalendar=*-*-* *:00,30:00 UTC
 ```
 
-Therefore, v1.7.0 triggers the capture service at minutes `00` and `30` of every hour.
+The capture service is therefore requested at minutes `00` and `30` of every hour in UTC.
 
-To change the current system schedule, create a `systemd` override:
+To change the schedule, create a `systemd` override:
 
 ```bash
 sudo systemctl edit phenocam-capture.timer
 ```
 
-For example, a 15-minute schedule requires:
+For example, to request a capture every 15 minutes:
 
 ```ini
 [Timer]
@@ -154,25 +164,34 @@ OnCalendar=
 OnCalendar=*-*-* *:00,15,30,45:00 UTC
 ```
 
-Then apply it:
+Apply the override:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart phenocam-capture.timer
 ```
 
-Line 6 must remain present because the settings parser requires the first six values.
+Position 6 must remain in `settings.txt` even when the timer is overridden.
 
 ---
 
 ## Network Selection
 
-Network interface selection follows this order:
+Network resolution first examines `IFACE`.
 
-1. the interface explicitly specified by `IFACE`;
-2. an Ethernet or Wi-Fi interface matching `NET_MODE`;
-3. the interface selected by the default internet route;
-4. the first non-loopback interface with a global IPv4 address.
+* If `IFACE` contains an existing interface name other than `auto`, that interface is returned.
+* If the requested interface does not exist, selection continues according to `NET_MODE`.
+
+`NET_MODE` selects one of three branches:
+
+| Value           | Behaviour                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ethernet`      | Returns the first interface with a global IPv4 address whose name begins with `eth` or `en`                                                |
+| `wifi`          | Returns the first interface with a global IPv4 address whose name begins with `wlan` or `wl`                                               |
+| `auto`          | Uses the interface selected by the route to `1.1.1.1`; if unavailable, returns the first non-loopback interface with a global IPv4 address |
+| any other value | Follows the same branch as `auto`                                                                                                          |
+
+The `ethernet` and `wifi` branches do not continue to default-route selection when no matching interface is found.
 
 Use:
 
@@ -180,7 +199,21 @@ Use:
 auto
 ```
 
-for both `IFACE` and `NET_MODE` when no specific interface is required.
+for both `IFACE` and `NET_MODE` when no interface restriction is required.
+
+---
+
+## Storage Selection
+
+A completed JPEG and metadata pair is assigned using this sequence:
+
+1. Use the RAM queue when its free space is at or above `RAM_MIN_FREE_MB`.
+2. Otherwise, locate the first mounted and writable filesystem below `USB_MOUNT_BASES`.
+3. Use its USB queue when usage is below `USB_MAX_USED_PCT`.
+4. Otherwise, attempt to use the SD queue.
+5. If SD usage is at or above `SD_MAX_USED_PCT`, remove the captured pair from staging and complete the cycle without queuing it.
+
+`SD_MAX_USED_PCT` is not checked while the RAM queue or a suitable USB queue can be used.
 
 ---
 
@@ -192,7 +225,7 @@ Edit:
 sudo nano /etc/phenocam/ftp_credentials.txt
 ```
 
-Add five non-empty values in this exact order:
+Add at least five effective values in this order:
 
 ```text
 FTP_HOST
@@ -202,9 +235,9 @@ FTP_USER
 FTP_PASS
 ```
 
-`FTP_PORT` must be numeric.
+Blank and comment lines are excluded when the file is read.
 
-The uploader always uses the `ftp://` protocol. Setting port `22` does not enable SFTP.
+`FTP_PORT` must contain only digits. The uploader always constructs an `ftp://` URL; using port `22` does not enable SFTP.
 
 FTP credentials are stored as plain text and must not be committed to the repository.
 
@@ -220,15 +253,15 @@ Display the generated public key:
 sudo cat /etc/phenocam/keys/phenocam_key.pub
 ```
 
-Install this public key on every destination server.
+Authorize it on every destination server.
 
-Never share the private key:
+Do not share the private key:
 
 ```text
 /etc/phenocam/keys/phenocam_key
 ```
 
-### 2. Configure the Hosts
+### 2. Configure Destination Hosts
 
 Edit:
 
@@ -236,7 +269,9 @@ Edit:
 sudo nano /etc/phenocam/server.txt
 ```
 
-Add one hostname or IP address per line. Empty lines and comments are ignored.
+Add one hostname or IP address per line.
+
+Use no leading or trailing whitespace. Comment lines must begin directly with `#`.
 
 ### 3. Configure the Username
 
@@ -248,29 +283,40 @@ Set `SFTP_USER` in position 8 of:
 
 ### 4. Register Server Fingerprints
 
-For each server, run:
+For each destination, run:
 
 ```bash
 sudo ssh-keyscan -H <hostname> |
   sudo tee -a /etc/phenocam/known_hosts >/dev/null
 ```
 
-SFTP uses strict host-key checking. Uploads fail when the destination is absent from `known_hosts`.
+SFTP uses:
+
+```text
+BatchMode=yes
+StrictHostKeyChecking=yes
+```
+
+An unknown server key or an unavailable private key causes the SFTP upload to fail.
 
 ---
 
 ## Upload Activation
 
-Upload protocols are enabled automatically from their effective configuration.
+Upload methods are selected from the effective content of their configuration files.
 
-| `server.txt` | `ftp_credentials.txt` | Active upload |
-| ------------ | --------------------- | ------------- |
-| Empty        | Empty or incomplete   | None          |
-| Configured   | Empty or incomplete   | SFTP          |
-| Empty        | Five valid values     | FTP           |
-| Configured   | Five valid values     | SFTP and FTP  |
+| `server.txt`                | `ftp_credentials.txt`                                 | Attempted upload |
+| --------------------------- | ----------------------------------------------------- | ---------------- |
+| No effective host           | Fewer than five effective lines or known placeholders | None             |
+| At least one effective host | Fewer than five effective lines or known placeholders | SFTP             |
+| No effective host           | At least five non-placeholder lines                   | FTP              |
+| At least one effective host | At least five non-placeholder lines                   | SFTP, then FTP   |
 
-When both protocols are active, a queued pair is retained until both uploads succeed.
+Activation does not guarantee that credentials, hosts or remote services are valid.
+
+When both protocols are enabled, both are attempted for each pair. Local files are removed only when every enabled upload succeeds.
+
+If one enabled target succeeds and another fails, the pair remains queued and is offered to all enabled targets again during the next upload cycle.
 
 ---
 
@@ -289,13 +335,15 @@ Any other value causes the upload attempt to fail.
 
 ## Apply and Verify
 
-Configuration files are read at the beginning of each capture or upload cycle. Changes take effect on the next execution.
+Configuration files are read at the beginning of each capture or upload cycle. Changes are therefore used by the next applicable execution.
 
 Check upload prerequisites with:
 
 ```bash
 sudo /usr/local/lib/phenocam/bin/diag_upload.sh
 ```
+
+This diagnostic checks the presence or file size of selected upload files. It does not validate their complete effective configuration and does not perform a transfer.
 
 For service management and runtime checks, see [Operations](OPERATIONS.md).
 
