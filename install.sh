@@ -288,7 +288,7 @@ if [[ -d "${SOFTWARE_DIR}/docs" ]]; then
   sudo cp -r "${SOFTWARE_DIR}/docs/." "${LIB_DIR}/docs/"
 fi
 
-for doc in README.md ReadME.txt CHANGELOG.md VERSIONS.txt VERSION; do
+for doc in CHANGELOG.md VERSION; do
   [[ -f "${SOFTWARE_DIR}/${doc}" ]] && sudo cp "${SOFTWARE_DIR}/${doc}" "${LIB_DIR}/docs/"
 done
 
