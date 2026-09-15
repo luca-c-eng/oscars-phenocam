@@ -1,6 +1,6 @@
 [Unit]
 Description=RAMDISK for PhenoCam queue
-Documentation=file:/usr/local/lib/phenocam/docs/README.md
+Documentation=file:/usr/local/lib/phenocam/docs/ARCHITECTURE.md
 
 [Mount]
 What=tmpfs
