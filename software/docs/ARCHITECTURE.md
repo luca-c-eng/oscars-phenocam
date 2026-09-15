@@ -1,43 +1,43 @@
 # Software Architecture
 
-OSCARS-PHENOCAM is composed of `systemd` units, executable entry points, reusable shell modules, configuration files, and three storage queues.
+OSCARS-PHENOCAM is composed of `systemd` units, executable entry points, reusable shell modules, configuration files and three storage queues.
 
-Capture and upload are independent processes. They can run concurrently and use separate locks.
+Capture and upload are independent processes. They can run concurrently and use separate lock files.
 
 ---
 
 ## Deployed Components
 
-| Path                              | Purpose                                      |
-| --------------------------------- | -------------------------------------------- |
-| `/opt/oscars-phenocam`            | Local copy of the Git repository             |
-| `/usr/local/lib/phenocam/bin`     | Executable entry points and diagnostics      |
-| `/usr/local/lib/phenocam/scripts` | Capture, metadata, storage, and upload logic |
-| `/usr/local/lib/phenocam/docs`    | Installed documentation                      |
-| `/etc/phenocam`                   | Station and upload configuration             |
-| `/run/phenocam`                   | Volatile runtime storage and locks           |
-| `/var/lib/phenocam/queue`         | Persistent SD-card fallback queue            |
-| `/var/log/phenocam`               | Application log directory                    |
+| Path                              | Purpose                                     |
+| --------------------------------- | ------------------------------------------- |
+| `/opt/oscars-phenocam`            | Local copy of the Git repository            |
+| `/usr/local/lib/phenocam/bin`     | Executable entry points and diagnostics     |
+| `/usr/local/lib/phenocam/scripts` | Capture, metadata, storage and upload logic |
+| `/usr/local/lib/phenocam/docs`    | Installed documentation                     |
+| `/etc/phenocam`                   | Station and upload configuration            |
+| `/run/phenocam`                   | Volatile runtime storage and locks          |
+| `/var/lib/phenocam/queue`         | Persistent SD fallback queue                |
+| `/var/log/phenocam`               | Application log directory                   |
 
-The runtime services use the dedicated `phenocam` system user. The installer adds this user to the `video` group for camera access.
+Runtime services use the dedicated `phenocam` system user. The installer adds this user to the `video` group.
 
 ---
 
 ## Runtime Layers
 
-| Layer         | Components              | Responsibility                                                          |
-| ------------- | ----------------------- | ----------------------------------------------------------------------- |
-| Scheduling    | `systemd` timers        | Starts capture, upload, and startup-test operations                     |
-| Execution     | `software/bin/*.sh`     | Provides locked entry points and diagnostics                            |
-| Processing    | `software/scripts/*.sh` | Implements acquisition, metadata, queues, network selection, and upload |
-| Configuration | `/etc/phenocam/*`       | Supplies station and remote-destination values                          |
-| Storage       | RAM, USB, and SD queues | Retains complete image and metadata pairs                               |
+| Layer         | Components              | Responsibility                                                 |
+| ------------- | ----------------------- | -------------------------------------------------------------- |
+| Scheduling    | `systemd` timers        | Requests capture, upload and startup-test operations           |
+| Execution     | `software/bin/*.sh`     | Provides locked entry points and diagnostics                   |
+| Processing    | `software/scripts/*.sh` | Implements acquisition, metadata, storage selection and upload |
+| Configuration | `/etc/phenocam/*`       | Supplies station and remote-destination values                 |
+| Storage       | RAM, USB and SD queues  | Retains image and metadata pairs                               |
 
 ---
 
 ## Boot Sequence
 
-At boot, `phenocam-init.service` executes:
+`phenocam-init.service` executes:
 
 ```text
 /usr/local/lib/phenocam/bin/phenocam-init-ramdisk.sh
@@ -45,16 +45,17 @@ At boot, `phenocam-init.service` executes:
 
 The script:
 
-1. reads the total system memory;
-2. calculates a RAM-disk size equal to 20% of total memory;
+1. reads total system memory;
+2. calculates a `tmpfs` size equal to 20% of total memory;
 3. applies a minimum size of 50 MB;
-4. updates `run-phenocam.mount` with the numeric `phenocam` user and group IDs;
-5. starts or updates the `/run/phenocam` `tmpfs`;
-6. creates the `queue` and `staging` directories.
+4. writes the numeric `phenocam` UID and GID into `run-phenocam.mount`;
+5. starts the mount when it is inactive;
+6. restarts it when its options changed and no queued JPEG or metadata files are present;
+7. creates `/run/phenocam/queue` and `/run/phenocam/staging`.
 
-If the mount is already active and contains `.jpg` or `.meta` files, it is not restarted when its options change.
+If the active mount contains `.jpg` or `.meta` files, it is not restarted when its options change.
 
-The startup timer then requests one capture-and-upload cycle approximately two minutes after boot. The capture step may produce no image when the station is outside its configured acquisition window.
+`phenocam-startup-cycle.timer` requests one startup test approximately two minutes after boot. The test calls capture first and upload second. Capture may complete without producing an image when the station is outside its acquisition window.
 
 ---
 
@@ -64,14 +65,12 @@ The startup timer then requests one capture-and-upload cycle approximately two m
 flowchart TD
     A["Capture timer"] --> B["Capture service"]
     B --> C["Acquire capture.lock"]
-    C --> D{"Inside capture window?"}
-    D -- No --> E["Finish without capture"]
-    D -- Yes --> F["Capture JPEG in staging"]
-    F --> G["Generate META sidecar"]
-    G --> H{"Select queue"}
-    H --> I["RAM queue"]
-    H --> J["USB queue"]
-    H --> K["SD queue or skip"]
+    C --> D{"Inside acquisition window?"}
+    D -- No --> E["Complete without image"]
+    D -- Yes --> F["Clean staging"]
+    F --> G["Capture JPEG"]
+    G --> H["Generate META"]
+    H --> I["Select destination queue"]
 ```
 
 The capture service executes:
@@ -89,30 +88,38 @@ phenocam-capture.sh
 ### Capture Sequence
 
 1. `phenocam-capture.sh` acquires `/run/phenocam/capture.lock`.
-2. `cycle.sh` loads `/etc/phenocam/settings.txt`.
+2. `cycle.sh` reads `/etc/phenocam/settings.txt`.
 3. The current station hour is compared with the acquisition window.
-4. Previous `.jpg` and `.meta` files left in staging are removed.
-5. `capture_vis.sh` creates the JPEG.
-6. `meta_build.sh` creates the corresponding sidecar.
-7. `queue_manager.sh` moves the complete pair into the selected queue.
+4. If the station is outside the window, the cycle returns successfully without modifying staging.
+5. During an eligible cycle, existing `.jpg` and `.meta` files in staging are removed.
+6. `capture_vis.sh` creates the JPEG.
+7. `meta_build.sh` creates its `.meta` sidecar.
+8. `queue_manager.sh` attempts to move the completed pair into a queue.
 
-Image acquisition uses `rpicam-still` when available and falls back to `libcamera-still`.
+Image acquisition uses `rpicam-still` when available and otherwise uses `libcamera-still`.
 
 ---
 
 ## Queue Selection
 
-```text
-RAM → USB → SD → capture skipped
+```mermaid
+flowchart TD
+    A["Completed pair"] --> B{"RAM free space sufficient?"}
+    B -- Yes --> C["RAM queue"]
+    B -- No --> D{"Writable USB below limit?"}
+    D -- Yes --> E["USB queue"]
+    D -- No --> F{"SD below limit?"}
+    F -- Yes --> G["SD queue"]
+    F -- No --> H["Remove staged pair"]
 ```
 
 Queue selection follows these rules:
 
-1. use RAM when its free space is at or above `RAM_MIN_FREE_MB`;
-2. otherwise use the first writable mounted filesystem found below `USB_MOUNT_BASES`;
-3. use USB only when its usage is below `USB_MAX_USED_PCT`;
-4. otherwise use the SD queue;
-5. skip the capture when SD usage is at or above `SD_MAX_USED_PCT`.
+1. use RAM when free space is at or above `RAM_MIN_FREE_MB`;
+2. otherwise locate the first mounted and writable filesystem below `USB_MOUNT_BASES`;
+3. use its USB queue when usage is below `USB_MAX_USED_PCT`;
+4. otherwise attempt to use the SD queue;
+5. if SD usage is at or above `SD_MAX_USED_PCT`, remove the captured pair from staging and return successfully without queuing it.
 
 | Queue | Path                          |
 | ----- | ----------------------------- |
@@ -120,30 +127,35 @@ Queue selection follows these rules:
 | USB   | `<mountpoint>/phenocam_queue` |
 | SD    | `/var/lib/phenocam/queue`     |
 
-RAM is volatile. USB and SD queues persist independently of the RAM-backed filesystem.
+The RAM queue is volatile. USB and SD queues reside outside the RAM-backed filesystem.
+
+`SD_MAX_USED_PCT` is checked only when SD fallback is required.
 
 ---
 
-## Atomic Pair Publication
+## Queue Pair Publication
 
-Images and metadata are first generated in:
+The JPEG and metadata files are first generated in:
 
 ```text
 /run/phenocam/staging
 ```
 
-Queue insertion uses temporary names:
+Queue insertion moves them to temporary destination names:
 
 ```text
 <basename>.jpg.tmp
 <basename>.meta.tmp
 ```
 
-The JPEG is renamed to its final name before the metadata file receives its final name.
+The files are then renamed in this order:
 
-The uploader discovers work by listing final `.meta` files. Therefore, when a metadata file becomes visible to the uploader, the corresponding final JPEG already exists.
+1. JPEG temporary file to final `.jpg`;
+2. metadata temporary file to final `.meta`.
 
-This mechanism allows capture and upload to operate independently without exposing a partially published pair.
+The uploader discovers work by listing final `.meta` files. Consequently, a visible final metadata file has a corresponding final JPEG at the time of publication.
+
+The JPEG and metadata files are not published by one filesystem operation. The final `.meta` filename acts as the signal that the pair is available for upload.
 
 ---
 
@@ -153,13 +165,13 @@ This mechanism allows capture and upload to operate independently without exposi
 flowchart TD
     A["Upload timer"] --> B["Upload service"]
     B --> C["Acquire upload.lock"]
-    C --> D{"Target and route available?"}
-    D -- No --> E["Keep queued pairs"]
-    D -- Yes --> F["Drain USB, SD, then RAM"]
-    F --> G["Upload complete pair"]
-    G --> H{"All enabled targets succeeded?"}
-    H -- Yes --> I["Delete local pair"]
-    H -- No --> J["Keep pair for retry"]
+    C --> D{"Configuration and route available?"}
+    D -- No --> E["Retain queued files"]
+    D -- Yes --> F["Process USB, SD and RAM"]
+    F --> G["Attempt enabled uploads"]
+    G --> H{"Every attempt succeeded?"}
+    H -- Yes --> I["Remove local pair"]
+    H -- No --> J["Retain pair for retry"]
 ```
 
 The upload service executes:
@@ -178,11 +190,11 @@ phenocam-upload.sh
 
 1. `phenocam-upload.sh` acquires `/run/phenocam/upload.lock`.
 
-2. The current configuration is loaded.
+2. The current settings are read.
 
-3. FTP and SFTP activation is determined from their configuration files.
+3. SFTP and FTP activation is determined from their configuration files.
 
-4. Internet availability is checked through the routing table.
+4. Internet-route availability is checked.
 
 5. Queues are processed in this order:
 
@@ -190,56 +202,80 @@ phenocam-upload.sh
    USB → SD → RAM
    ```
 
-6. Only complete `.jpg` and `.meta` pairs are processed.
+6. Queue work is discovered from final `.meta` filenames.
 
-7. The pair is removed only after every enabled protocol succeeds.
+7. A pair is processed only when its matching `.jpg` file exists.
 
-When both FTP and SFTP are enabled, both are attempted for each pair.
+8. SFTP is attempted first when enabled.
 
-No per-destination delivery state is stored. If one enabled target succeeds and another fails, the retained pair is offered to all enabled targets again during the next upload cycle.
+9. FTP is then attempted when enabled.
+
+10. The local pair is removed only when every enabled upload attempt succeeds.
+
+No per-destination delivery state is stored. If one destination succeeds and another fails, the retained pair is offered to all enabled destinations again during the next upload cycle.
 
 ---
 
 ## Failure Behaviour
 
-| Condition                         | Result                                            |
-| --------------------------------- | ------------------------------------------------- |
-| Invalid `settings.txt`            | The requested service fails                       |
-| Outside acquisition window        | Capture ends successfully without producing files |
-| Camera failure                    | Capture service fails                             |
-| Metadata failure                  | Capture service fails                             |
-| SD usage threshold reached        | Staged pair is removed and capture is skipped     |
-| No upload method configured       | Upload ends without removing queued files         |
-| No internet route at upload start | Upload is postponed                               |
-| Upload target failure             | Pair remains queued for retry                     |
-| Incomplete queue pair             | Pair is ignored and remains in place              |
-| Existing operation lock           | The duplicate operation fails immediately         |
+| Condition                             | Result                                                              |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| Invalid `settings.txt`                | Requested service fails                                             |
+| Outside acquisition window            | Capture cycle completes without producing files                     |
+| Camera failure                        | Capture service fails                                               |
+| Metadata failure                      | Capture service fails                                               |
+| SD fallback threshold reached         | Captured pair is removed and the cycle completes without queuing it |
+| No upload method configured           | Upload completes without removing queued files                      |
+| No internet route at upload start     | Upload is postponed and queued files remain                         |
+| Network lost while processing a pair  | Pair remains queued and upload returns a non-zero result            |
+| Upload target failure                 | Pair remains queued for another cycle                               |
+| Final `.meta` without matching `.jpg` | Incomplete pair is ignored and remains in place                     |
+| Existing operation lock               | Duplicate operation fails immediately                               |
 
-Files left in staging after a failed capture cycle are removed at the beginning of the next eligible capture cycle.
+Files left in staging after a failed eligible capture cycle are removed at the beginning of the next cycle that is inside the acquisition window.
 
 ---
 
 ## USB Event Handling
 
-The installed `udev` rule starts dedicated handlers for USB block-device insertion and removal.
+The installed `udev` rule starts handlers for USB block-device insertion and removal.
 
-On insertion, the attach handler waits for an external automount process and then searches for the first writable mount below the configured base paths. It creates:
+The handlers do not read `/etc/phenocam/settings.txt`. They use `USB_MOUNT_BASES` only if it is already present in their environment; otherwise they scan:
 
 ```text
-<mountpoint>/phenocam_queue
+/media
+/mnt
 ```
 
-The handler does not mount the filesystem itself.
+On insertion, the attach handler:
 
-On removal, the detach handler checks configured mount locations, performs a lazy unmount when an inaccessible stale mount remains, and removes orphan `.tmp` files from the SD queue.
+1. waits three seconds for an external automount process;
+2. searches for the first mounted and writable filesystem below the scanned paths;
+3. creates:
+
+   ```text
+   <mountpoint>/phenocam_queue
+   ```
+
+The handler does not mount the filesystem and does not enforce a filesystem type.
+
+On removal, the detach handler:
+
+1. scans the same mount locations;
+2. attempts a lazy unmount when a registered mountpoint is no longer accessible;
+3. removes orphan `.tmp` files from the SD queue.
+
+Regular capture and upload processes read `USB_MOUNT_BASES` from `settings.txt`.
 
 ---
 
 ## Manual Wrapper
 
-`phenocam-run.sh` executes one capture request followed by one upload request.
+`phenocam-run.sh` requests one capture followed by one upload.
 
-No installed `systemd` unit calls this wrapper in v1.7.0. Regular operation uses the dedicated capture, upload, and startup-cycle services.
+Because the wrapper uses `set -e`, upload is not executed if the capture command returns a non-zero status.
+
+No installed `systemd` unit calls this wrapper in `dev/v1.7.0`. Regular operation uses the dedicated capture, upload and startup-cycle services.
 
 ---
 
