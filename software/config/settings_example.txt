@@ -1,49 +1,155 @@
-# settings.txt — PhenoCam v1.4.0 positional configuration
-# Comments and blank lines are ignored. Keep every real field as one non-empty line.
+# OSCARS-PHENOCAM dev/v1.7.0 settings example
+
+#
+
+# Positional format: one effective value per field.
+
+# Blank lines and comment lines are ignored.
+
+# Do not use a blank line to represent an empty field.
+
+# Do not change the order of the values.
+
+#
+
+# The first six effective values are mandatory.
 
 # 1 SITENAME
-phenozero
+
+# Used in filenames, metadata and remote paths.
+
+mysite
+
 # 2 UTC_OFFSET
-+2
+
+# Fixed station offset. Examples: 0, +1, -5, +5:30.
+
++1
+
 # 3 TZ_LABEL
-Europe/Rome
+
+# Required by the positional parser, but regenerated from UTC_OFFSET.
+
+UTC+1
+
 # 4 START_HOUR
+
+# Acquisition-window start, inclusive.
+
 6
-# 5 END_HOUR — exclusive
+
+# 5 END_HOUR
+
+# Acquisition-window end, exclusive.
+
 22
+
 # 6 INTERVAL_MIN
+
+# Required and exported, but not used by the v1.7.0 capture timer.
+
 30
-# 7 IFACE — wlan0 for Zero 2 W Wi-Fi, eth0 for Ethernet
-wlan0
-# 8 SFTP_USER — only used if server.txt enables SFTP
+
+# 7 IFACE
+
+# auto or an explicit interface name.
+
+auto
+
+# 8 SFTP_USER
+
+# Remote username used when SFTP is enabled.
+
 phenocam
-# 9 NET_MODE — auto | ethernet | wifi
-wifi
+
+# 9 NET_MODE
+
+# auto, ethernet or wifi.
+
+auto
+
 # 10 RAM_MIN_FREE_MB
+
+# Minimum RAM-queue free space before spillover.
+
 20
+
 # 11 SD_MAX_USED_PCT
+
+# Applied only when fallback to the SD queue is required.
+
 80
+
 # 12 USB_MOUNT_BASES
+
+# Colon-separated mount locations scanned during regular capture and upload.
+
 /media:/mnt
+
 # 13 USB_MAX_USED_PCT
+
+# USB is selected only when its usage is below this value.
+
 90
-# 14 REMOTE_LAYOUT — general | icos
+
+# 14 REMOTE_LAYOUT
+
+# general or icos.
+
 general
+
 # 15 SITE_LAT
+
+# Written as lat in metadata.
+
 nd
+
 # 16 SITE_LON
+
+# Written as lon in metadata.
+
 nd
+
 # 17 SITE_ELEV_M
+
+# Written as elev in metadata.
+
 nd
+
 # 18 SITE_START_DATE
+
+# Written as start_date in metadata.
+
 nd
+
 # 19 SITE_END_DATE
+
+# Written as end_date in metadata.
+
 nd
+
 # 20 SITE_NIMAGE
+
+# Written as nimage in metadata.
+
 nd
-# 21 BOARD — rpi3b+ | rpizero2w | unknown
-rpizero2w
-# 22 CAMERA_MODEL — imx708 | imx708_noir
+
+# 21 BOARD
+
+# Read and exported, but not consumed by the runtime scripts.
+
+unknown
+
+# 22 CAMERA_MODEL
+
+# Read and exported, but not consumed by the runtime scripts.
+
 imx708
-# 23 CAPTURE_TIMEOUT — ms, rpicam warm-up time
+
+# 23 CAPTURE_TIMEOUT
+
+# Camera warm-up time in milliseconds.
+
+# A non-numeric value is replaced with 30000.
+
 30000
