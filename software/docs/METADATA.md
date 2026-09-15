@@ -1,21 +1,38 @@
 # Metadata
 
-OSCARS-PHENOCAM creates one plain-text `.meta` sidecar for every captured JPEG image.
+After a successful camera command, OSCARS-PHENOCAM generates a plain-text `.meta` sidecar before selecting the destination queue.
 
-The image and metadata files share the same base name:
+The JPEG and metadata files share the same base name:
 
 ```text
 SITENAME_YYYY_MM_DD_HHMMSS.jpg
 SITENAME_YYYY_MM_DD_HHMMSS.meta
 ```
 
-The filename timestamp is generated immediately before image capture, using the configured fixed station time.
+The filename timestamp is generated immediately before image acquisition, using the fixed station time derived from `UTC_OFFSET`.
+
+---
+
+## Generation Sequence
+
+The metadata lifecycle is:
+
+1. generate the filename timestamp;
+2. capture the JPEG in `/run/phenocam/staging`;
+3. generate the `.meta` sidecar;
+4. attempt to move both files into the selected queue.
+
+If the camera command fails, metadata generation is not attempted.
+
+If metadata generation fails, the capture service returns an error and the JPEG remains in staging until a later eligible capture cycle performs staging cleanup.
+
+If SD fallback is required and SD usage is at or above `SD_MAX_USED_PCT`, both generated files are removed without being queued.
 
 ---
 
 ## File Structure
 
-Each `.meta` file contains five sections:
+Each generated `.meta` file contains five sections:
 
 ```text
 [system]
@@ -25,77 +42,91 @@ Each `.meta` file contains five sections:
 [exif]
 ```
 
-The first four sections use `key=value` records. The `[exif]` section contains the grouped text output produced by `exiftool`.
+The first four sections contain `key=value` records. The `[exif]` section contains grouped text returned by `exiftool`.
 
 ---
 
 ## `[system]`
 
-| Field               | Content                                                |
+| Field               | Generated content                                      |
 | ------------------- | ------------------------------------------------------ |
-| `sitename`          | Station identifier from `SITENAME`                     |
-| `hostname`          | Fully qualified hostname, with local hostname fallback |
-| `timestamp`         | Sidecar-generation time in ISO 8601 format             |
+| `sitename`          | Value of `SITENAME`                                    |
+| `hostname`          | Output of `hostname -f`, with `hostname` as fallback   |
+| `timestamp`         | Metadata-generation time from `date -Is`               |
 | `datetime_original` | Quoted copy of `timestamp`                             |
 | `tz`                | Fixed timezone label generated from `UTC_OFFSET`       |
-| `utc_offset`        | Configured station UTC offset                          |
-| `network`           | Selected remote layout: `general` or `icos`            |
-| `lat`               | Configured site latitude                               |
-| `lon`               | Configured site longitude                              |
-| `elev`              | Configured site elevation                              |
-| `start_date`        | Configured site start date                             |
-| `end_date`          | Configured site end date                               |
-| `nimage`            | Configured site image value                            |
-| `iface`             | Selected network interface                             |
-| `ip`                | IPv4 address of the selected interface                 |
-| `mac`               | MAC address of the selected interface                  |
+| `utc_offset`        | Configured `UTC_OFFSET`                                |
+| `network`           | Value of `REMOTE_LAYOUT`                               |
+| `lat`               | Value of `SITE_LAT`                                    |
+| `lon`               | Value of `SITE_LON`                                    |
+| `elev`              | Value of `SITE_ELEV_M`                                 |
+| `start_date`        | Value of `SITE_START_DATE`                             |
+| `end_date`          | Value of `SITE_END_DATE`                               |
+| `nimage`            | Value of `SITE_NIMAGE`                                 |
+| `iface`             | Interface returned by the network resolver             |
+| `ip`                | IPv4 address of the resolved interface                 |
+| `mac`               | MAC address read from `/sys/class/net/<iface>/address` |
 | `image_file`        | JPEG filename without its local path                   |
 
-`timestamp` and `datetime_original` are created after image acquisition, when metadata generation begins. They may therefore differ slightly from the timestamp contained in the filename.
+`timestamp` and `datetime_original` are generated after image acquisition begins. They can therefore differ from the timestamp included in the filename.
 
-The `network` field records `REMOTE_LAYOUT`. It does not identify the active interface or whether FTP or SFTP is being used.
+The `network` field records `REMOTE_LAYOUT`. It does not identify the active network interface or the upload protocol.
 
-If no network interface is resolved, `iface`, `ip`, and `mac` may be empty.
+If no interface is resolved, `iface`, `ip` and `mac` can be empty.
 
 ---
 
 ## `[phenocam]`
 
-| Field              | Content                                    |
-| ------------------ | ------------------------------------------ |
-| `software_name`    | Installed software name                    |
-| `software_version` | Value installed from `software/VERSION`    |
-| `software_branch`  | Repository branch used during installation |
-| `software_commit`  | Short Git commit identifier                |
-| `installed_at`     | Installation timestamp in ISO 8601 format  |
+| Field              | Generated content                                        |
+| ------------------ | -------------------------------------------------------- |
+| `software_name`    | Installed software name                                  |
+| `software_version` | Installed version value                                  |
+| `software_branch`  | Repository branch recorded during installation           |
+| `software_commit`  | Short Git commit identifier recorded during installation |
+| `installed_at`     | Installation timestamp generated by `date -Is`           |
 
-These values are normally read from:
+The values are normally copied from:
 
 ```text
 /usr/local/lib/phenocam/BUILD_INFO
 ```
 
-If `BUILD_INFO` is unavailable, the software uses `/usr/local/lib/phenocam/VERSION` when possible and writes `nd` for unavailable build information.
+The installer creates this file with:
+
+```text
+software_name
+software_version
+software_branch
+software_commit
+installed_at
+```
+
+If `BUILD_INFO` is not readable, metadata generation:
+
+1. writes `software_name=oscars-phenocam`;
+2. reads `software_version` from `/usr/local/lib/phenocam/VERSION` when available;
+3. writes `nd` for unavailable version, branch, commit and installation values.
 
 ---
 
 ## `[system_health]`
 
-| Field                      | Content                                         |
-| -------------------------- | ----------------------------------------------- |
-| `soc_temp_c`               | Raspberry Pi SoC temperature in degrees Celsius |
-| `throttled_hex`            | Raw `vcgencmd get_throttled` value              |
-| `arm_clock_mhz`            | Current ARM clock frequency in MHz              |
-| `undervoltage_now`         | Current undervoltage flag                       |
-| `arm_freq_capped_now`      | Current ARM-frequency limitation flag           |
-| `throttled_now`            | Current throttling flag                         |
-| `soft_temp_limit_now`      | Current soft-temperature-limit flag             |
-| `undervoltage_occurred`    | Undervoltage detected since boot                |
-| `arm_freq_capped_occurred` | ARM-frequency limitation detected since boot    |
-| `throttled_occurred`       | Throttling detected since boot                  |
-| `soft_temp_limit_occurred` | Soft temperature limit detected since boot      |
+| Field                      | Software source                             |
+| -------------------------- | ------------------------------------------- |
+| `soc_temp_c`               | SoC temperature                             |
+| `throttled_hex`            | Raw result of `vcgencmd get_throttled`      |
+| `arm_clock_mhz`            | ARM clock converted from hertz to megahertz |
+| `undervoltage_now`         | Bit 0 of the throttling value               |
+| `arm_freq_capped_now`      | Bit 1                                       |
+| `throttled_now`            | Bit 2                                       |
+| `soft_temp_limit_now`      | Bit 3                                       |
+| `undervoltage_occurred`    | Bit 16                                      |
+| `arm_freq_capped_occurred` | Bit 17                                      |
+| `throttled_occurred`       | Bit 18                                      |
+| `soft_temp_limit_occurred` | Bit 19                                      |
 
-Boolean health fields contain:
+Decoded flag fields contain:
 
 ```text
 0
@@ -103,15 +134,27 @@ Boolean health fields contain:
 nd
 ```
 
-Where:
+where:
 
-* `0` means the flag is not set;
-* `1` means the flag is set;
-* `nd` means the value could not be determined.
+* `0` means the decoded bit is not set;
+* `1` means the decoded bit is set;
+* `nd` means the hexadecimal value could not be decoded.
 
-Temperature is read from `/sys/class/thermal/thermal_zone0/temp` when available, otherwise through `vcgencmd`.
+Temperature is read from:
 
-For health interpretation, see [System Health and Thermal Monitoring](THERMAL_MONITORING.md).
+```text
+/sys/class/thermal/thermal_zone0/temp
+```
+
+When that file is unavailable, the software attempts:
+
+```text
+vcgencmd measure_temp
+```
+
+If `vcgencmd` is unavailable, `throttled_hex` and `arm_clock_mhz` are written as `nd`.
+
+For the diagnostic output implemented by the software, see [System Health and Thermal Monitoring](THERMAL_MONITORING.md).
 
 ---
 
@@ -132,46 +175,67 @@ For health interpretation, see [System Health and Thermal Monitoring](THERMAL_MO
 | `lens_position` |         `0.0` |
 | `quality`       |         `100` |
 
-These values correspond to the parameters passed to `rpicam-still` or `libcamera-still`.
+These are the default values passed to `rpicam-still` or `libcamera-still`.
 
-The capture warm-up value `CAPTURE_TIMEOUT` and the operating-system timeout guard are not written to this section.
+The capture script accepts environment-variable overrides with the same names. When an override is present in the process environment, the corresponding metadata field uses that value.
+
+`CAPTURE_TIMEOUT` and the operating-system guard timeout are not included in this section.
 
 ---
 
 ## `[exif]`
 
-The `[exif]` section is generated with:
+The `[exif]` section is generated by executing:
 
 ```bash
 exiftool -a -u -g1 <image.jpg>
 ```
 
-It contains grouped EXIF information extracted from the JPEG, including duplicate and unknown tags reported by `exiftool`.
+The options request:
 
-Unlike the previous sections, this content is not normalized into `key=value` records.
+* duplicate tags;
+* unknown tags;
+* grouped output.
 
-Metadata generation fails when `exiftool` is unavailable.
+The resulting text is appended directly below the `[exif]` header. It is not converted into `key=value` records.
+
+Metadata generation returns an error when `exiftool` is unavailable or when the command fails.
 
 ---
 
 ## Configuration Values Not Recorded
 
-The following values are read from `settings.txt` but are not written to the `.meta` file in v1.7.0:
+The following values are read from `settings.txt` but are not written to the metadata file:
 
-* `INTERVAL_MIN`
-* `BOARD`
-* `CAMERA_MODEL`
-* `CAPTURE_TIMEOUT`
+```text
+INTERVAL_MIN
+BOARD
+CAMERA_MODEL
+CAPTURE_TIMEOUT
+```
 
-`BOARD` and `CAMERA_MODEL` also have no runtime effect after being loaded by the current software.
+`INTERVAL_MIN`, `BOARD` and `CAMERA_MODEL` are exported but have no further runtime consumer in `dev/v1.7.0`.
+
+`CAPTURE_TIMEOUT` is used by the camera command but is not recorded in the sidecar.
 
 ---
 
-## Pair Lifecycle
+## Queue and Upload Lifecycle
 
-The `.jpg` and `.meta` files are moved into the selected queue as one logical pair.
+The generated JPEG and metadata files are moved from staging to temporary queue names:
 
-The uploader processes only complete pairs. When an enabled upload target fails, both local files remain queued for a later attempt.
+```text
+<basename>.jpg.tmp
+<basename>.meta.tmp
+```
+
+The JPEG receives its final name before the metadata file receives its final name.
+
+The uploader discovers work by listing final `.meta` files and processes a pair only when the matching final `.jpg` exists.
+
+When an enabled upload attempt fails, both local files remain queued. They are removed only after every enabled upload succeeds.
+
+For the complete publication and upload flow, see [Software Architecture](ARCHITECTURE.md).
 
 ---
 
