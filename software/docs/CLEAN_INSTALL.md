@@ -2,20 +2,32 @@
 
 This guide describes a clean installation of OSCARS-PHENOCAM `dev/v1.7.0`.
 
-For configuration details, see [Configuration](CONFIGURATION.md).
+For all configuration fields, see [Configuration](CONFIGURATION.md).
 
 ---
 
-## Requirements
+## Before Installation
 
-Before starting, make sure the Raspberry Pi has:
-
-* Raspberry Pi OS 64-bit based on Debian 13 `trixie`
-* an active internet connection
-* a connected camera supported by `rpicam-still`
-* a regular user account with `sudo` privileges
+Use a regular user account with `sudo` privileges.
 
 Do not run the installer as `root`.
+
+The installer expects:
+
+* Raspberry Pi OS 64-bit based on Debian 13 `trixie`;
+* `aarch64` architecture;
+* a route to `1.1.1.1`;
+* `rpicam-still`;
+* `curl`;
+* `sftp`;
+* `flock`;
+* `/usr/sbin/runuser`.
+
+A different operating-system version or architecture produces a warning but does not stop the installer.
+
+A missing network route, required command or `sudo` access stops installation.
+
+A supported camera is required for acquisition, but the installer can finish when a camera is not currently detected.
 
 ---
 
@@ -29,96 +41,10 @@ curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/hea
 
 The installer:
 
-* verifies the operating system, architecture, network, and required commands;
-* installs `git` and `exiftool`;
-* clones the `dev/v1.7.0` branch into `/opt/oscars-phenocam`;
-* deploys the runtime files to `/usr/local/lib/phenocam`;
-* creates the `phenocam` system user and runtime directories;
-* creates the configuration files in `/etc/phenocam`;
-* generates the SSH key pair used for SFTP;
-* installs the `systemd` units, USB rules, and log rotation;
-* prepares the RAM-backed queue;
-* enables the capture, upload, and startup-test timers for the next boot.
-
-Existing configuration files are not overwritten.
-
----
-
-## Configure the Station
-
-Set the station name and acquisition parameters:
-
-```bash
-sudo nano /etc/phenocam/settings.txt
-```
-
-At minimum, replace the default station name on the first line.
-
-Then configure at least one upload method.
-
-### FTP
-
-```bash
-sudo nano /etc/phenocam/ftp_credentials.txt
-```
-
-### SFTP
-
-SFTP requires:
-
-* one or more hosts in `/etc/phenocam/server.txt`;
-* the SFTP username in `/etc/phenocam/settings.txt`;
-* the server fingerprints in `/etc/phenocam/known_hosts`;
-* authorization of the generated public key on the remote server.
-
-See [Configuration](CONFIGURATION.md) for the required formats.
-
----
-
-## Reboot
-
-After completing the configuration, reboot the Raspberry Pi:
-
-```bash
-sudo reboot
-```
-
-The timers enabled by the installer will start automatically after boot.
-
----
-
-## Verify the Installation
-
-Check the camera:
-
-```bash
-sudo /usr/local/lib/phenocam/bin/diag_camera.sh
-```
-
-Check the enabled services and timers:
-
-```bash
-sudo systemctl status \
-  phenocam-init.service \
-  phenocam-startup-cycle.timer \
-  phenocam-capture.timer \
-  phenocam-upload.timer
-```
-
-Check the scheduled executions:
-
-```bash
-systemctl list-timers 'phenocam-*' --all
-```
-
-Check the runtime log:
-
-```bash
-sudo tail -n 50 /var/log/phenocam/phenocam.log
-```
-
-For operational commands and diagnostics, see [Operations](OPERATIONS.md).
-
----
-
-[Back to the project README](../../README.md)
+1. checks the execution user, operating system, architecture, route and required commands;
+2. installs `git` and `libimage-exiftool-perl`;
+3. clones `dev/v1.7.0` into `/opt/oscars-phenocam`;
+4. creates the `phenocam` system user;
+5. deploys runtime files to `/usr/local/lib/phenocam`;
+6. creates configuration files in `/etc/phenocam`;
+7. generates the
