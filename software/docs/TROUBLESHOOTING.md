@@ -305,7 +305,7 @@ Verify that:
 
 * the five required values are present;
 * `FTP_PORT` contains only digits;
-* the installer placeholder values are not being used;
+* the known example placeholders are not used for `FTP_HOST`, `FTP_PORT`, `FTP_USER` or `FTP_PASS`;
 * `REMOTE_LAYOUT` is `general` or `icos`.
 
 The uploader always constructs an `ftp://` URL. Port `22` does not change the protocol to SFTP.
