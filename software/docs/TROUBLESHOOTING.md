@@ -1,6 +1,6 @@
 # Troubleshooting
 
-This guide covers failures and unexpected behaviour directly handled or reported by OSCARS-PHENOCAM `dev/v1.7.0`.
+This guide covers failures and runtime conditions directly handled or reported by OSCARS-PHENOCAM `dev/v1.7.0`.
 
 For routine commands, see [Operations](OPERATIONS.md).
 
@@ -25,13 +25,13 @@ Check recent application events:
 sudo tail -n 100 /var/log/phenocam/phenocam.log
 ```
 
-List the next scheduled executions:
+List scheduled executions:
 
 ```bash
 systemctl list-timers 'phenocam-*' --all
 ```
 
-Capture and upload services are `oneshot` units. After a successful execution, an `inactive (dead)` state is normal. Their timers should remain active.
+Capture and upload services are `oneshot` units. An `inactive (dead)` state is normal after a successful execution; their timers should remain active.
 
 ---
 
@@ -51,15 +51,15 @@ Do not prefix this command with `sudo`.
 
 ### No Network Route
 
-The installer requires:
+The installer requires this command to succeed:
 
 ```bash
 ip route get 1.1.1.1
 ```
 
-to succeed. If no route is available, installation stops before packages and repository files are downloaded.
+If it fails, installation stops before package installation and repository download.
 
-Inspect the network state with:
+Inspect the network state:
 
 ```bash
 ip link
@@ -79,7 +79,7 @@ flock
 /usr/sbin/runuser
 ```
 
-The installer installs `git` and `libimage-exiftool-perl`, but expects the commands above to be provided by the operating system.
+The installer installs `git` and `libimage-exiftool-perl`.
 
 ---
 
@@ -92,10 +92,14 @@ sudo systemctl status phenocam-init.service
 sudo journalctl -u phenocam-init.service -n 120 --no-pager
 ```
 
-The initialization script fails when:
+The initialization script performs explicit checks for:
 
-* `/etc/systemd/system/run-phenocam.mount` is missing;
-* the `phenocam` system user does not exist.
+```text
+/etc/systemd/system/run-phenocam.mount
+phenocam system user
+```
+
+It exits with an error when either is missing.
 
 Check the mount:
 
@@ -119,11 +123,21 @@ Run:
 sudo /usr/local/lib/phenocam/bin/diag_camera.sh
 ```
 
-The diagnostic uses `rpicam-hello --list-cameras`, with `libcamera-hello` as fallback.
+The diagnostic uses:
 
-If neither command exists, the diagnostic terminates with an error.
+```text
+rpicam-hello --list-cameras
+```
 
-After the installer has requested camera activation, a reboot may be required:
+and falls back to:
+
+```text
+libcamera-hello --list-cameras
+```
+
+If neither command exists, the diagnostic exits with an error.
+
+After the installer requests camera activation, a reboot may be required:
 
 ```bash
 sudo reboot
@@ -131,9 +145,9 @@ sudo reboot
 
 ---
 
-## No Image Is Captured
+## No Image Is Available After a Cycle
 
-Inspect the capture service and log:
+Inspect the service and logs:
 
 ```bash
 sudo systemctl status phenocam-capture.service
@@ -141,62 +155,80 @@ sudo journalctl -u phenocam-capture.service -n 100 --no-pager
 sudo tail -n 100 /var/log/phenocam/phenocam.log
 ```
 
-Possible code-level causes are:
+| Condition                                                       | Executed behaviour                                                                      |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Outside the acquisition window                                  | Cycle returns successfully without capturing an image                                   |
+| Invalid `settings.txt`                                          | Capture service fails                                                                   |
+| Camera command unavailable or unsuccessful                      | Capture service fails                                                                   |
+| Camera guard timeout reached                                    | Camera process is terminated and capture fails                                          |
+| `exiftool` unavailable                                          | Metadata generation fails                                                               |
+| SD fallback required and SD usage at or above `SD_MAX_USED_PCT` | Captured JPEG and metadata are removed; cycle returns successfully without queuing them |
+| `capture.lock` already held                                     | Duplicate capture exits with an error                                                   |
+| Timer event missed while powered off                            | Event is not replayed                                                                   |
 
-| Condition                                  | Behaviour                                                   |
-| ------------------------------------------ | ----------------------------------------------------------- |
-| Outside the configured capture window      | Service completes without creating an image                 |
-| Invalid `settings.txt`                     | Capture service fails                                       |
-| Camera command unavailable or unsuccessful | Capture service fails                                       |
-| Camera timeout reached                     | Capture command is terminated                               |
-| `exiftool` unavailable                     | Metadata generation fails                                   |
-| SD usage threshold reached                 | Captured staging files are removed and the cycle is skipped |
-| `capture.lock` already held                | Duplicate capture exits immediately                         |
-| Timer event missed while powered off       | Event is not replayed                                       |
+`phenocam-capture.timer` uses:
 
-The capture timer uses `Persistent=false`.
+```ini
+Persistent=false
+```
 
-### Startup Test Succeeds but Creates No Image
+### Staging Cleanup
 
-The startup cycle calls the standard capture entry point. The same acquisition-window check is applied.
+Staging cleanup occurs only after the acquisition-window check succeeds.
 
-A successful startup cycle outside the configured window may therefore complete without creating a new image.
+Files left in:
+
+```text
+/run/phenocam/staging
+```
+
+are therefore removed at the beginning of the next capture cycle that is inside the configured acquisition window.
+
+A cycle outside the acquisition window does not clean staging.
+
+---
+
+## Startup Test Creates No Image
+
+The startup service calls the standard capture entry point before calling upload.
+
+The same acquisition-window check is applied. When the station is outside the window, the capture command returns successfully without creating an image, and the startup service continues with the upload request.
 
 ---
 
 ## Capture or Upload Reports a Lock Error
 
-The software uses:
+The software uses separate non-blocking locks:
 
 ```text
 /run/phenocam/capture.lock
 /run/phenocam/upload.lock
 ```
 
-Locks are non-blocking. A duplicate operation fails when another instance of the same operation is already running.
+A duplicate operation exits with an error when another instance of the same operation holds the corresponding lock.
 
-Check the corresponding service:
+Check the related service:
 
 ```bash
 systemctl status phenocam-capture.service
 systemctl status phenocam-upload.service
 ```
 
-A lock file may remain on disk after execution. Its presence alone does not mean that the lock is active.
+A lock file may remain on the filesystem after execution. Its presence does not prove that the lock is currently held.
 
 ---
 
 ## Upload Does Not Start
 
-Run the prerequisite diagnostic:
+Run:
 
 ```bash
 sudo /usr/local/lib/phenocam/bin/diag_upload.sh
 ```
 
-This command only checks whether expected files exist or are non-empty. It does not validate their effective contents or attempt a transfer.
+This diagnostic checks only whether selected files exist or have non-zero size. It does not validate their effective contents and does not attempt a transfer.
 
-A comment-only `ftp_credentials.txt`, for example, is non-empty but does not enable FTP in the uploader.
+A comment-only configuration file is non-empty and may therefore be reported as present by the diagnostic while remaining disabled in the uploader.
 
 Check the application log:
 
@@ -210,20 +242,20 @@ Check the upload service:
 sudo journalctl -u phenocam-upload.service -n 100 --no-pager
 ```
 
-Possible causes are:
+Code-level causes include:
 
-* no internet route;
+* no route to `1.1.1.1`;
 * no effective FTP or SFTP configuration;
 * invalid `settings.txt`;
 * missing SFTP username;
-* missing private key;
+* missing SFTP private key;
 * missing `known_hosts`;
-* invalid FTP credential structure;
+* incomplete FTP credentials;
 * non-numeric FTP port;
 * unsupported `REMOTE_LAYOUT`;
-* an upload operation already holding `upload.lock`.
+* an existing `upload.lock`.
 
-For the required file formats, see [Configuration](CONFIGURATION.md).
+For configuration formats, see [Configuration](CONFIGURATION.md).
 
 ---
 
@@ -231,12 +263,12 @@ For the required file formats, see [Configuration](CONFIGURATION.md).
 
 Verify that:
 
-1. `/etc/phenocam/server.txt` contains at least one effective hostname or IP;
-2. `SFTP_USER` is configured in `settings.txt`;
-3. `/etc/phenocam/keys/phenocam_key` exists;
-4. the public key is authorized on the remote server;
-5. every server fingerprint is present in `/etc/phenocam/known_hosts`;
-6. `REMOTE_LAYOUT` is `general` or `icos`.
+* `/etc/phenocam/server.txt` contains at least one destination;
+* `SFTP_USER` is set in `settings.txt`;
+* `/etc/phenocam/keys/phenocam_key` exists;
+* the public key is authorized on every destination;
+* every destination fingerprint is present in `/etc/phenocam/known_hosts`;
+* `REMOTE_LAYOUT` is `general` or `icos`.
 
 SFTP uses:
 
@@ -245,13 +277,15 @@ BatchMode=yes
 StrictHostKeyChecking=yes
 ```
 
-It does not request an interactive password or accept an unknown server key.
+The uploader does not request an interactive password and does not accept an unknown server key.
 
-Display the public key with:
+Display the public key:
 
 ```bash
 sudo cat /etc/phenocam/keys/phenocam_key.pub
 ```
+
+When several SFTP destinations are configured, processing stops at the first destination that returns an upload error. The local pair remains queued.
 
 ---
 
@@ -269,12 +303,14 @@ FTP_PASS
 
 Verify that:
 
-* none of the values is empty;
-* `FTP_PORT` is numeric;
-* placeholder values have been replaced;
+* the five required values are present;
+* `FTP_PORT` contains only digits;
+* the installer placeholder values are not being used;
 * `REMOTE_LAYOUT` is `general` or `icos`.
 
-The FTP uploader always builds an `ftp://` URL. Port `22` does not switch the protocol to SFTP.
+The uploader always constructs an `ftp://` URL. Port `22` does not change the protocol to SFTP.
+
+FTP uses passive mode, creates remote directories where supported and applies connection, transfer and retry limits.
 
 ---
 
@@ -282,13 +318,13 @@ The FTP uploader always builds an `ftp://` URL. Port `22` does not switch the pr
 
 Queued files are retained when:
 
-* no internet route is available;
-* no upload protocol is configured;
-* an FTP or SFTP upload fails;
-* one of the enabled protocols fails;
-* a pair is incomplete.
+* no route to `1.1.1.1` is available;
+* no upload method is configured;
+* an enabled SFTP or FTP attempt fails;
+* one of several enabled destinations fails;
+* a final `.meta` file has no matching `.jpg`.
 
-When both FTP and SFTP are enabled, the local pair is removed only after both protocols succeed.
+When both FTP and SFTP are enabled, the local pair is removed only after both protocol attempts succeed.
 
 Inspect the queues:
 
@@ -297,35 +333,48 @@ sudo ls -lah /run/phenocam/queue
 sudo ls -lah /var/lib/phenocam/queue
 ```
 
-The uploader processes USB first, then SD, then RAM.
+The uploader processes available queues in this order:
+
+```text
+USB → SD → RAM
+```
 
 ---
 
 ## USB Queue Is Not Used
 
-USB storage is spillover storage. It is not used while the RAM queue still has at least `RAM_MIN_FREE_MB` available.
+USB is spillover storage. It is not selected while the RAM queue has at least `RAM_MIN_FREE_MB` available.
 
-The software uses a USB queue only when:
+During a capture cycle, a USB queue is eligible only when:
 
 * the filesystem is already mounted;
 * its mountpoint is below a path listed in `USB_MOUNT_BASES`;
 * the mountpoint is writable;
 * its usage is below `USB_MAX_USED_PCT`.
 
-The USB handler does not mount the filesystem. It waits for an external automount process and then creates:
+The USB event handler does not mount filesystems. It waits three seconds for an external automount process and then searches for a writable mountpoint.
+
+When found, it creates:
 
 ```text
 <mountpoint>/phenocam_queue
 ```
 
-Inspect mounts with:
+The event handler does not load `settings.txt`; without an externally supplied `USB_MOUNT_BASES`, it searches below:
+
+```text
+/media
+/mnt
+```
+
+Inspect current mounts:
 
 ```bash
 mount
 df -h
 ```
 
-Check USB-related events in:
+Check application events:
 
 ```bash
 sudo tail -n 100 /var/log/phenocam/phenocam.log
@@ -335,7 +384,9 @@ sudo tail -n 100 /var/log/phenocam/phenocam.log
 
 ## Incomplete or Temporary Files
 
-The uploader discovers pairs from final `.meta` filenames. A `.meta` file without the matching `.jpg` is logged as an incomplete pair and remains in the queue.
+The uploader discovers queued work from final `.meta` filenames.
+
+A final `.meta` file without its matching `.jpg` is logged as incomplete and remains in place. A `.jpg` without a final `.meta` file is not discovered by the uploader.
 
 Temporary queue files use:
 
@@ -344,9 +395,9 @@ Temporary queue files use:
 *.meta.tmp
 ```
 
-Staging `.jpg` and `.meta` files left by a failed capture are removed at the beginning of the next capture cycle.
-
 The USB detach handler removes orphan `.tmp` files from the SD queue.
+
+Staging `.jpg` and `.meta` files left by an interrupted eligible capture cycle are removed during the next cycle that passes the acquisition-window check.
 
 ---
 
@@ -358,9 +409,19 @@ Run:
 sudo /usr/local/lib/phenocam/bin/diag_system_health.sh
 ```
 
-Temperature is read from the thermal sysfs interface or `vcgencmd`.
+Temperature is read from:
 
-Throttling flags and ARM clock frequency require `vcgencmd`. When a value cannot be obtained or decoded, the corresponding output is `nd`.
+```text
+/sys/class/thermal/thermal_zone0/temp
+```
+
+with `vcgencmd measure_temp` as fallback.
+
+Throttling flags and ARM clock frequency require `vcgencmd`. When a value cannot be decoded, the corresponding decoded field is reported as:
+
+```text
+nd
+```
 
 See [System Health and Thermal Monitoring](THERMAL_MONITORING.md).
 
@@ -375,10 +436,19 @@ cat /usr/local/lib/phenocam/BUILD_INFO
 cat /usr/local/lib/phenocam/VERSION
 ```
 
-`BUILD_INFO` is created during installation and contains the software name, version, branch, commit, and installation timestamp.
+`BUILD_INFO` is created during installation and contains:
 
-When it is unavailable, generated metadata falls back to `VERSION` and uses `nd` for unavailable build fields.
+```text
+software_name
+software_version
+software_branch
+software_commit
+installed_at
+```
+
+When `BUILD_INFO` is unavailable, metadata generation reads `VERSION` when possible and uses `nd` for the unavailable build fields.
 
 ---
 
 [Configuration](CONFIGURATION.md) · [Operations](OPERATIONS.md) · [Software Architecture](ARCHITECTURE.md) · [Back to the project README](../../README.md)
+
