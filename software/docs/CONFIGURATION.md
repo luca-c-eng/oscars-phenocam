@@ -303,14 +303,25 @@ An unknown server key or an unavailable private key causes the SFTP upload to fa
 
 ## Upload Activation
 
-Upload methods are selected from the effective content of their configuration files.
+SFTP is enabled when `server.txt` contains at least one non-empty, non-comment line.
 
-| `server.txt`                | `ftp_credentials.txt`                                 | Attempted upload |
-| --------------------------- | ----------------------------------------------------- | ---------------- |
-| No effective host           | Fewer than five effective lines or known placeholders | None             |
-| At least one effective host | Fewer than five effective lines or known placeholders | SFTP             |
-| No effective host           | At least five non-placeholder lines                   | FTP              |
-| At least one effective host | At least five non-placeholder lines                   | SFTP, then FTP   |
+FTP is enabled when `ftp_credentials.txt` contains at least five effective lines and positions 1, 2, 4 and 5 do not contain these example placeholders:
+
+```text
+YOUR_FTP_HOST_OR_IP
+YOUR_FTP_PORT
+your_ftp_username
+your_ftp_password
+```
+
+The remote-base value in position 3 is not checked against an example placeholder during activation.
+
+| `server.txt`                | FTP configuration | Attempted upload |
+| --------------------------- | ----------------- | ---------------- |
+| No effective host           | Disabled          | None             |
+| At least one effective host | Disabled          | SFTP             |
+| No effective host           | Enabled           | FTP              |
+| At least one effective host | Enabled           | SFTP, then FTP   |
 
 Activation does not guarantee that credentials, hosts or remote services are valid.
 
