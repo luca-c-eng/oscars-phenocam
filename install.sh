@@ -124,7 +124,6 @@ else
 
   if [[ "$INSTALLED_EXIFTOOL" != "$EXIFTOOL_VERSION" ]]; then
     log_warn "Installed version ($INSTALLED_EXIFTOOL) differs from pinned ($EXIFTOOL_VERSION)."
-    log_warn "Software will likely work, but report this for future VERSIONS.txt update."
   fi
 fi
 
