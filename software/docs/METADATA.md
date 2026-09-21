@@ -32,7 +32,7 @@ If SD fallback is required and SD usage is at or above `SD_MAX_USED_PCT`, both g
 
 ## File Structure
 
-Each generated `.meta` file contains five sections:
+Immediately after capture, each generated `.meta` file contains five sections:
 
 ```text
 [system]
@@ -43,6 +43,15 @@ Each generated `.meta` file contains five sections:
 ```
 
 The first four sections contain `key=value` records. The `[exif]` section contains grouped text returned by `exiftool`.
+
+During queue processing, v1.8.0 appends a sixth section:
+
+```text
+[detection]
+```
+
+This section records whether detection was enabled, the selected mode and,
+when Vision Edge runs, its validated result.
 
 ---
 
@@ -203,6 +212,99 @@ Metadata generation returns an error when `exiftool` is unavailable or when the 
 
 ---
 
+## `[detection]`
+
+The detection section is added while the pair is in a queue. It is not created
+by `meta_build.sh` during capture.
+
+### Detection Disabled
+
+When `VISION_EDGE_ENABLED=off`, the section contains only:
+
+```ini
+[detection]
+filter_enabled=off
+filter_mode=<configured mode>
+```
+
+No inference is executed. The pair is then eligible for upload.
+
+### Detection Enabled
+
+When `VISION_EDGE_ENABLED=on`, Phenocam Vision Edge v0.2.3 first writes its
+result. OSCARS-PHENOCAM validates that result and atomically inserts
+`filter_enabled` and `filter_mode` as the first two fields:
+
+```ini
+[detection]
+filter_enabled=on
+filter_mode=<metadata|annotated|privacy|delete>
+detected=<true|false>
+software_name=phenocam-detection
+software_version=0.2.3
+model_id=yolo26n-phenocam
+model_version=0.1.6
+annotated_image=<JPEG filename or empty>
+privacy_image=<JPEG filename or empty>
+classes=<comma-separated class names or empty>
+<class_key>_count=<positive integer>
+total_count=<sum of class counts or 0>
+```
+
+| Field | Meaning |
+| ----- | ------- |
+| `filter_enabled` | Effective detection state for this pair: `on` or `off`. |
+| `filter_mode` | Effective mode recorded when the pair is processed. |
+| `detected` | `true` when at least one enabled final detection exists; otherwise `false`. |
+| `software_name` | Fixed Vision Edge metadata identity: `phenocam-detection`. |
+| `software_version` | Vision Edge version required by this integration: `0.2.3`. |
+| `model_id` | Model identifier read from the installed receipt: `yolo26n-phenocam`. |
+| `model_version` | Model version read from the installed receipt: `0.1.6`. |
+| `annotated_image` | Queued JPEG filename for a positive `annotated` result; otherwise empty. |
+| `privacy_image` | Queued JPEG filename for a positive `privacy` result; otherwise empty. |
+| `classes` | Detected enabled class names in a comma-separated list, or empty. |
+| `<class_key>_count` | Positive count for a detected class; spaces in its class name become underscores. |
+| `total_count` | Sum of all per-class counts, or `0`. |
+
+Per-class count fields exist only for names listed in `classes`. A negative
+result contains no per-class count fields and uses:
+
+```ini
+detected=false
+annotated_image=
+privacy_image=
+classes=
+total_count=0
+```
+
+### Mode-Specific Metadata
+
+| Mode | Retained metadata result |
+| ---- | ------------------------ |
+| `metadata` | Image-path fields remain empty for positive and negative results. |
+| `annotated` | `annotated_image` contains the JPEG filename only for a positive result. |
+| `privacy` | `privacy_image` contains the JPEG filename only for a positive result. |
+| `delete` | A negative result is retained with empty image paths; a positive result deletes both the JPEG and `.meta` file. |
+
+Because a positive `delete` result removes the pair, no corresponding final
+detection section remains available for upload.
+
+### State and Validation
+
+A file without `[detection]` is `pending`. A valid Vision Edge section without
+the two `filter_*` fields is an intermediate `vision` state. A section with
+`filter_enabled=off` is `off`; a validated enabled section is `ready`.
+
+Only `off` and `ready` pairs are eligible for upload. The metadata helper
+rejects non-regular files, symbolic links, multiple detection sections,
+duplicate fields, unexpected identities, inconsistent class counts and output
+paths that do not match the selected mode.
+
+Both the Vision Edge update and the OSCARS integration update use a temporary
+file followed by `os.replace`. The existing metadata file mode is preserved.
+
+---
+
 ## Configuration Values Not Recorded
 
 The following values are read from `settings.txt` but are not written to the metadata file:
@@ -214,9 +316,14 @@ CAMERA_MODEL
 CAPTURE_TIMEOUT
 ```
 
-`INTERVAL_MIN`, `BOARD` and `CAMERA_MODEL` are exported but have no further runtime consumer in `dev/v1.7.0`.
+`INTERVAL_MIN`, `BOARD` and `CAMERA_MODEL` are exported but have no further
+runtime consumer in `dev/v1.8.0`.
 
 `CAPTURE_TIMEOUT` is used by the camera command but is not recorded in the sidecar.
+
+`VISION_EDGE_ENABLED` and `VISION_EDGE_MODE` are not part of the five initial
+capture sections. Their effective values are added later as `filter_enabled`
+and `filter_mode` in `[detection]`.
 
 ---
 
@@ -231,7 +338,9 @@ The generated JPEG and metadata files are moved from staging to temporary queue 
 
 The JPEG receives its final name before the metadata file receives its final name.
 
-The uploader discovers work by listing final `.meta` files and processes a pair only when the matching final `.jpg` exists.
+The detection manager discovers work first by listing final `.meta` files. The
+uploader later processes a pair only when the matching final `.jpg` exists and
+the detection state is `off` or `ready`.
 
 When an enabled upload attempt fails, both local files remain queued. They are removed only after every enabled upload succeeds.
 
@@ -239,4 +348,4 @@ For the complete publication and upload flow, see [Software Architecture](ARCHIT
 
 ---
 
-[Configuration](CONFIGURATION.md) · [Operations](OPERATIONS.md) · [Back to the project README](../../README.md)
+[Configuration](CONFIGURATION.md) | [Operations](OPERATIONS.md) | [Back to the project README](../../README.md)
