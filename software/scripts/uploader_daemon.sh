@@ -67,6 +67,11 @@ upload_pair_to_targets() {
     return 0
   }
 
+    if ! detection_pair_ready "$meta"; then
+    warn "Upload postponed; detection not complete: ${base}"
+    return 0
+  fi
+
   if ! has_internet; then
     warn "No internet route during upload cycle: upload postponed"
     return 10
