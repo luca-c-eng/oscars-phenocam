@@ -67,7 +67,7 @@ upload_pair_to_targets() {
     return 0
   }
 
-    if ! detection_pair_ready "$meta"; then
+  if ! detection_pair_ready "$meta"; then
     warn "Upload postponed; detection not complete: ${base}"
     return 0
   fi
