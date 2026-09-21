@@ -414,4 +414,4 @@ For service management and runtime checks, see [Operations](OPERATIONS.md).
 
 ---
 
-[Clean installation](CLEAN_INSTALL.md) Â· [Back to the project README](../../README.md)
+[Clean installation](CLEAN_INSTALL.md) | [Back to the project README](../../README.md)
