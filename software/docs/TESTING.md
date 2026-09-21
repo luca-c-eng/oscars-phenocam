@@ -62,7 +62,7 @@ The suite verifies:
 - one-time processing of a newly queued pair;
 - rejection of pending pairs by the upload readiness gate;
 - successful privacy-mode metadata handling;
-- recovery from partial deletion in `delete` mode`;
+- recovery from partial deletion in `delete` mode;
 - retention and upload rejection of invalid metadata.
 
 The test substitutes deterministic detection results and does not execute ONNX
