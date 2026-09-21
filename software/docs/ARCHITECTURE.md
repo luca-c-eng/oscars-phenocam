@@ -1,8 +1,12 @@
 # Software Architecture
 
-OSCARS-PHENOCAM is composed of `systemd` units, executable entry points, reusable shell modules, configuration files and three storage queues.
+OSCARS-PHENOCAM is composed of `systemd` units, executable entry points,
+reusable shell and Python modules, configuration files, a pinned Vision Edge
+runtime and three storage queues.
 
-Capture and upload are independent processes. They can run concurrently and use separate lock files.
+Capture uses `capture.lock`. Detection and upload execute sequentially while
+holding `upload.lock`. Capture can therefore run concurrently with the
+detection/upload cycle, but detection and upload cannot overlap each other.
 
 ---
 
@@ -12,8 +16,9 @@ Capture and upload are independent processes. They can run concurrently and use 
 | --------------------------------- | ------------------------------------------- |
 | `/opt/oscars-phenocam`            | Local copy of the Git repository            |
 | `/usr/local/lib/phenocam/bin`     | Executable entry points and diagnostics     |
-| `/usr/local/lib/phenocam/scripts` | Capture, metadata, storage and upload logic |
+| `/usr/local/lib/phenocam/scripts` | Capture, metadata, storage, detection and upload logic |
 | `/usr/local/lib/phenocam/docs`    | Installed documentation                     |
+| `/opt/phenocam-vision-edge-0.2.3` | Pinned Vision Edge runtime, model and receipt |
 | `/etc/phenocam`                   | Station and upload configuration            |
 | `/run/phenocam`                   | Volatile runtime storage and locks          |
 | `/var/lib/phenocam/queue`         | Persistent SD fallback queue                |
@@ -29,7 +34,8 @@ Runtime services use the dedicated `phenocam` system user. The installer adds th
 | ------------- | ----------------------- | -------------------------------------------------------------- |
 | Scheduling    | `systemd` timers        | Requests capture, upload and startup-test operations           |
 | Execution     | `software/bin/*.sh`     | Provides locked entry points and diagnostics                   |
-| Processing    | `software/scripts/*.sh` | Implements acquisition, metadata, storage selection and upload |
+| Processing    | `software/scripts/*`    | Implements acquisition, metadata, storage, detection and upload |
+| Inference     | Phenocam Vision Edge    | Performs ONNX detection and requested image handling            |
 | Configuration | `/etc/phenocam/*`       | Supplies station and remote-destination values                 |
 | Storage       | RAM, USB and SD queues  | Retains image and metadata pairs                               |
 
@@ -77,12 +83,12 @@ The capture service executes:
 
 ```text
 phenocam-capture.sh
-  └─ cycle.sh
-      ├─ config_read.sh
-      ├─ capture_vis.sh
-      ├─ meta_build.sh
-      ├─ storage_manager.sh
-      └─ queue_manager.sh
+  `-- cycle.sh
+      |-- config_read.sh
+      |-- capture_vis.sh
+      |-- meta_build.sh
+      |-- storage_manager.sh
+      `-- queue_manager.sh
 ```
 
 ### Capture Sequence
@@ -153,9 +159,91 @@ The files are then renamed in this order:
 1. JPEG temporary file to final `.jpg`;
 2. metadata temporary file to final `.meta`.
 
-The uploader discovers work by listing final `.meta` files. Consequently, a visible final metadata file has a corresponding final JPEG at the time of publication.
+The detection manager and uploader discover work by listing final `.meta`
+files. Consequently, a visible final metadata file has a corresponding final
+JPEG at the time of publication.
 
-The JPEG and metadata files are not published by one filesystem operation. The final `.meta` filename acts as the signal that the pair is available for upload.
+The JPEG and metadata files are not published by one filesystem operation. The
+final `.meta` filename acts as the signal that the pair is available for queue
+processing.
+
+---
+
+## Detection Flow
+
+```mermaid
+flowchart TD
+    A["Final queued pair"] --> B{"Detection state"}
+    B -- Complete --> C["Skip detection"]
+    B -- Pending --> D{"Detection enabled?"}
+    D -- No --> E["Write off state"]
+    D -- Yes --> F["Run Vision Edge"]
+    F --> G{"Result"}
+    G -- Retained --> H["Validate metadata and write ready state"]
+    G -- Deleted --> I["Pair removed"]
+    G -- Failed --> J["Retain pair and block upload"]
+```
+
+Detection is part of the upload entry point and runs before any Internet-route
+check. It processes queues in this order:
+
+```text
+USB -> SD -> RAM
+```
+
+The detection execution chain is:
+
+```text
+phenocam-upload.sh
+  `-- detection_manager.sh
+      |-- detection_metadata.py
+      `-- /opt/phenocam-vision-edge-0.2.3/.venv/bin/python -m phenocam
+```
+
+### Detection States
+
+The `.meta` sidecar is the only persistent detection state. No separate marker
+file is created.
+
+| State     | Meaning |
+| --------- | ------- |
+| `pending` | No `[detection]` section exists; the pair has not been processed by v1.8.0. |
+| `vision`  | Vision Edge wrote its result, but OSCARS integration fields are not yet present. |
+| `off`     | Detection was disabled for this pair; it is eligible for upload. |
+| `ready`   | Vision Edge output and OSCARS integration fields passed validation; the pair is eligible for upload. |
+
+Pairs in `off` or `ready` state are never sent through inference again. A
+`vision` state is completed without repeating inference. This recovers the
+interval between the Vision Edge metadata commit and the OSCARS metadata
+commit.
+
+When detection is disabled, the integration writes `filter_enabled=off` and
+the configured `filter_mode` without running Vision Edge.
+
+When detection is enabled, the manager constructs a fixed command array. The
+configuration value selects one of four internal branches; it is not evaluated
+as shell code:
+
+| Mode        | Command action |
+| ----------- | -------------- |
+| `metadata`  | Supplies only the existing `.meta` path. |
+| `annotated` | Supplies the queued JPEG as both input and annotated output. |
+| `privacy`   | Supplies the queued JPEG as both input and privacy output. |
+| `delete`    | Requests conditional deletion of the input and metadata. |
+
+For `annotated` and `privacy`, a positive result atomically replaces the queued
+JPEG. A negative result leaves the original JPEG unchanged. For `delete`, a
+positive result removes both files; a negative result retains the JPEG and
+records the completed result.
+
+If deletion removes the JPEG but metadata deletion fails, the manager removes
+the remaining metadata file during the same cycle. Other detection failures
+leave the pair queued and not eligible for upload.
+
+Capture uses a different lock and may publish a pair after the detection scan
+has completed. The uploader therefore checks every pair's detection state
+again. A newly published `pending` pair remains queued until the next detection
+cycle.
 
 ---
 
@@ -165,52 +253,63 @@ The JPEG and metadata files are not published by one filesystem operation. The f
 flowchart TD
     A["Upload timer"] --> B["Upload service"]
     B --> C["Acquire upload.lock"]
-    C --> D{"Configuration and route available?"}
-    D -- No --> E["Retain queued files"]
-    D -- Yes --> F["Process USB, SD and RAM"]
-    F --> G["Attempt enabled uploads"]
-    G --> H{"Every attempt succeeded?"}
-    H -- Yes --> I["Remove local pair"]
-    H -- No --> J["Retain pair for retry"]
+    C --> D["Validate detection settings"]
+    D --> E["Process pending detection"]
+    E --> F{"Upload method and route available?"}
+    F -- No --> G["Retain upload-eligible pairs"]
+    F -- Yes --> H["Process USB, SD and RAM"]
+    H --> I{"Pair off or ready?"}
+    I -- No --> J["Retain pair"]
+    I -- Yes --> K["Attempt enabled uploads"]
+    K --> L{"Every attempt succeeded?"}
+    L -- Yes --> M["Remove local pair"]
+    L -- No --> N["Retain pair for retry"]
 ```
 
 The upload service executes:
 
 ```text
 phenocam-upload.sh
-  ├─ config_read.sh
-  ├─ net_check.sh
-  ├─ storage_manager.sh
-  ├─ upload_sftp.sh
-  ├─ upload_ftp.sh
-  └─ uploader_daemon.sh
+  |-- config_read.sh
+  |-- storage_manager.sh
+  |-- detection_manager.sh
+  |   `-- detection_metadata.py
+  |-- net_check.sh
+  |-- upload_sftp.sh
+  |-- upload_ftp.sh
+  `-- uploader_daemon.sh
 ```
 
 ### Upload Sequence
 
 1. `phenocam-upload.sh` acquires `/run/phenocam/upload.lock`.
 
-2. The current settings are read.
+2. The current settings are read and the two Vision Edge values are validated.
 
-3. SFTP and FTP activation is determined from their configuration files.
+3. Pending detection work is processed for USB, SD and RAM, without requiring
+   an Internet route.
 
-4. Internet-route availability is checked.
+4. SFTP and FTP activation is determined from their configuration files.
 
-5. Queues are processed in this order:
+5. Internet-route availability is checked when at least one upload method is
+   configured.
+
+6. Upload queues are processed in this order:
 
    ```text
-   USB → SD → RAM
+   USB -> SD -> RAM
    ```
 
-6. Queue work is discovered from final `.meta` filenames.
+7. Queue work is discovered from final `.meta` filenames.
 
-7. A pair is processed only when its matching `.jpg` file exists.
+8. A pair is offered to an upload target only when its matching `.jpg` exists
+   and detection state is `off` or `ready`.
 
-8. SFTP is attempted first when enabled.
+9. SFTP is attempted first when enabled.
 
-9. FTP is then attempted when enabled.
+10. FTP is then attempted when enabled.
 
-10. The local pair is removed only when every enabled upload attempt succeeds.
+11. The local pair is removed only when every enabled upload attempt succeeds.
 
 No per-destination delivery state is stored. If one destination succeeds and another fails, the retained pair is offered to all enabled destinations again during the next upload cycle.
 
@@ -221,12 +320,17 @@ No per-destination delivery state is stored. If one destination succeeds and ano
 | Condition                             | Result                                                              |
 | ------------------------------------- | ------------------------------------------------------------------- |
 | Invalid `settings.txt`                | Requested service fails                                             |
+| Unsupported Vision Edge value         | Upload cycle fails before detection; capture configuration still loads |
+| Detection metadata runtime unavailable | Upload cycle stops before queue upload                              |
+| Vision Edge runtime unavailable       | Pending enabled pairs remain queued and are not uploaded             |
+| Detection or result validation failure | Affected pair remains queued and is not uploaded                    |
+| Positive result in `delete` mode      | JPEG and metadata are removed before the upload phase                |
 | Outside acquisition window            | Capture cycle completes without producing files                     |
 | Camera failure                        | Capture service fails                                               |
 | Metadata failure                      | Capture service fails                                               |
 | SD fallback threshold reached         | Captured pair is removed and the cycle completes without queuing it |
-| No upload method configured           | Upload completes without removing queued files                      |
-| No internet route at upload start     | Upload is postponed and queued files remain                         |
+| No upload method configured           | Detection still runs; no remaining pair is transferred by uploader |
+| No internet route at upload start     | Detection can complete; upload is postponed and queued files remain |
 | Network lost while processing a pair  | Pair remains queued and upload returns a non-zero result            |
 | Upload target failure                 | Pair remains queued for another cycle                               |
 | Final `.meta` without matching `.jpg` | Incomplete pair is ignored and remains in place                     |
@@ -275,8 +379,9 @@ Regular capture and upload processes read `USB_MOUNT_BASES` from `settings.txt`.
 
 Because the wrapper uses `set -e`, upload is not executed if the capture command returns a non-zero status.
 
-No installed `systemd` unit calls this wrapper in `dev/v1.7.0`. Regular operation uses the dedicated capture, upload and startup-cycle services.
+No installed `systemd` unit calls this wrapper in `dev/v1.8.0`. Regular
+operation uses the dedicated capture, upload and startup-cycle services.
 
 ---
 
-[Configuration](CONFIGURATION.md) · [Operations](OPERATIONS.md) · [Back to the project README](../../README.md)
+[Configuration](CONFIGURATION.md) | [Operations](OPERATIONS.md) | [Back to the project README](../../README.md)
