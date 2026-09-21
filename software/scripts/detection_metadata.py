@@ -27,6 +27,9 @@ VISION_IDENTITY = {
 _LINE_ENDING = re.compile(r"\r\n|\r|\n")
 _SECTION_HEADER = re.compile(r"\[([^\[\]]+)\]")
 _FIELD_KEY = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+_CLASS_NAME = re.compile(r"[a-z0-9]+(?: [a-z0-9]+)*")
+_NONNEGATIVE_INTEGER = re.compile(r"0|[1-9][0-9]*")
+_POSITIVE_INTEGER = re.compile(r"[1-9][0-9]*")
 
 
 class MetadataError(RuntimeError):
@@ -75,18 +78,55 @@ def _fields(lines: list[str], start: int, end: int) -> dict[str, str]:
 
 
 def _validate_vision(fields: dict[str, str]) -> None:
+    fields = {
+        key: value
+        for key, value in fields.items()
+        if key not in ("filter_enabled", "filter_mode")
+    }
     if not VISION_FIELDS.issubset(fields):
         raise MetadataError()
     if any(fields[key] != value for key, value in VISION_IDENTITY.items()):
         raise MetadataError()
     if fields["detected"] not in ("true", "false"):
         raise MetadataError()
-    if not fields["total_count"].isdigit():
+
+    if not _NONNEGATIVE_INTEGER.fullmatch(fields["total_count"]):
         raise MetadataError()
-    count = int(fields["total_count"])
-    if (count > 0) != (fields["detected"] == "true"):
+    total_count = int(fields["total_count"])
+
+    classes = tuple(fields["classes"].split(",")) if fields["classes"] else ()
+    if (
+        any(not _CLASS_NAME.fullmatch(name) for name in classes)
+        or len(classes) != len(set(classes))
+    ):
         raise MetadataError()
-    if (count > 0) != bool(fields["classes"]):
+
+    count_keys = tuple(f"{name.replace(' ', '_')}_count" for name in classes)
+    if len(count_keys) != len(set(count_keys)):
+        raise MetadataError()
+    if set(fields) != VISION_FIELDS | set(count_keys):
+        raise MetadataError()
+
+    counts = tuple(fields[key] for key in count_keys)
+    if any(not _POSITIVE_INTEGER.fullmatch(value) for value in counts):
+        raise MetadataError()
+    if sum(int(value) for value in counts) != total_count:
+        raise MetadataError()
+    if bool(classes) != (fields["detected"] == "true"):
+        raise MetadataError()
+
+
+def _validate_mode_outputs(fields: dict[str, str], path: Path, mode: str) -> None:
+    detected = fields["detected"] == "true"
+    image_name = path.with_suffix(".jpg").name
+    expected_annotated = image_name if detected and mode == "annotated" else ""
+    expected_privacy = image_name if detected and mode == "privacy" else ""
+
+    if fields["annotated_image"] != expected_annotated:
+        raise MetadataError()
+    if fields["privacy_image"] != expected_privacy:
+        raise MetadataError()
+    if mode == "delete" and detected:
         raise MetadataError()
 
 
@@ -200,7 +240,8 @@ def mark_on(path: Path, mode: str) -> None:
     if _state(text) != "vision":
         raise MetadataError()
     lines = text.splitlines(keepends=True)
-    start, _ = _detection_ranges(lines)[0]
+    start, end = _detection_ranges(lines)[0]
+    _validate_mode_outputs(_fields(lines, start, end), path, mode)
     ending_match = _LINE_ENDING.search(text)
     ending = ending_match.group() if ending_match else "\n"
     fields = (f"filter_enabled=on{ending}", f"filter_mode={mode}{ending}")
