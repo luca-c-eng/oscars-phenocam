@@ -7,11 +7,11 @@ IFS=$'\n\t'
 # =============================================================================
 # Usage (run as any user with sudo privileges):
 #
-#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.7.0/install.sh | bash
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.8.0/install.sh | bash
 #
 # Optional:
 #
-#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.7.0/install.sh -o install.sh
+#  curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.8.0/install.sh -o install.sh
 #  PHENOCAM_DISABLE_TIMERS=1 bash install.sh
 #
 # What this script does:
@@ -19,12 +19,13 @@ IFS=$'\n\t'
 #   2. Installs system dependencies (git, exiftool)
 #   3. Clones or updates the repository from GitHub
 #   4. Verifies all expected critical files are present
-#   5. Enables the camera interface if needed
-#   6. Deploys the software to system directories
-#   7. Creates configuration file templates without overwriting existing config
-#   8. Installs systemd units, logrotate config and udev rules
-#   9. Prepares RAMDISK and enables production timers for boot
-#  10. Reports installation status and next actions
+#   5. Installs and verifies Phenocam Vision Edge v0.2.3
+#   6. Enables the camera interface if needed
+#   7. Deploys the software to system directories
+#   8. Creates configuration file templates without overwriting existing config
+#   9. Installs systemd units, logrotate config and udev rules
+#  10. Prepares RAMDISK and enables production timers for boot
+#  11. Reports installation status and next actions
 #
 # After installation, configure:
 #   sudo nano /etc/phenocam/settings.txt
@@ -36,7 +37,7 @@ IFS=$'\n\t'
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/luca-c-eng/oscars-phenocam.git"
-REPO_BRANCH="dev/v1.7.0"
+REPO_BRANCH="dev/v1.8.0"
 INSTALL_DIR="/opt/oscars-phenocam"
 SOFTWARE_DIR="${INSTALL_DIR}/software"
 LIB_DIR="/usr/local/lib/phenocam"
@@ -44,6 +45,15 @@ CONFIG_DIR="/etc/phenocam"
 LOG_DIR="/var/log/phenocam"
 SYSTEMD_DIR="/etc/systemd/system"
 UDEV_DIR="/etc/udev/rules.d"
+
+VISION_EDGE_VERSION="0.2.3"
+VISION_EDGE_PACKAGE="phenocam-vision-edge-${VISION_EDGE_VERSION}"
+VISION_EDGE_URL="https://github.com/e-tufarini-terrasystem/phenocam-vision-edge/releases/download/v${VISION_EDGE_VERSION}/${VISION_EDGE_PACKAGE}.tar.gz"
+VISION_EDGE_ARCHIVE_SHA256="23987a1380942038f9b5342cfaa57558ea115108aeedc2005d1c6a5dae31b89c"
+VISION_EDGE_PACKAGE_INIT_SHA256="503aec85ebbee26128fe2779536a6f797f9b71767a1d898087adea6a1c872071"
+VISION_EDGE_MODEL_SHA256="72521182fa0c90fec60fb1cd9f3b2ac113d16de476aaeea3a328508b7b2d0b30"
+VISION_EDGE_RECEIPT_SHA256="42455bcbfec8cb1aa0b052c6d66174dba3a864119b28dde8755ed22a801422af"
+VISION_EDGE_DIR="/opt/${VISION_EDGE_PACKAGE}"
 
 # Pinned dependency versions (tested and verified)
 EXIFTOOL_VERSION="13.25+dfsg-1"
@@ -133,6 +143,25 @@ if dpkg-query -W libimage-exiftool-perl >/dev/null 2>&1; then
   log_ok "exiftool version frozen (apt-mark hold)"
 fi
 
+# Install the virtual-environment module required by Phenocam Vision Edge.
+if dpkg-query -W -f='${Status}' python3-venv 2>/dev/null \
+    | grep -qx 'install ok installed'; then
+  log_ok "python3-venv already present"
+else
+  sudo apt-get install -y python3-venv
+  dpkg-query -W -f='${Status}' python3-venv 2>/dev/null \
+    | grep -qx 'install ok installed' \
+    || log_fatal "python3-venv installation failed."
+  log_ok "python3-venv installed"
+fi
+
+[[ -x /usr/bin/python3 ]] || log_fatal "Python not found at /usr/bin/python3."
+/usr/bin/python3 -c 'import venv' >/dev/null 2>&1 \
+  || log_fatal "Python venv module is unavailable."
+/usr/bin/python3 -c 'import sys; raise SystemExit(sys.version_info[:2] != (3, 13))' \
+  >/dev/null 2>&1 || log_fatal "Phenocam Vision Edge requires Python 3.13."
+log_ok "Python: $(/usr/bin/python3 --version)"
+
 # Verify other required tools.
 for tool in rpicam-still curl sftp flock; do
   if command -v "$tool" >/dev/null 2>&1; then
@@ -190,6 +219,8 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/scripts/upload_sftp.sh"
   "${SOFTWARE_DIR}/scripts/upload_ftp.sh"
   "${SOFTWARE_DIR}/scripts/uploader_daemon.sh"
+  "${SOFTWARE_DIR}/scripts/detection_manager.sh"
+  "${SOFTWARE_DIR}/scripts/detection_metadata.py"
 
   "${SOFTWARE_DIR}/config/phenocam.logrotate"
 
@@ -217,7 +248,82 @@ for f in "${CRITICAL_FILES[@]}"; do
   fi
 done
 
-# ── Step 5 — Enable camera ────────────────────────────────────────────────────
+# ── Step 5 — Install Phenocam Vision Edge ────────────────────────────────────
+log_step "Installing Phenocam Vision Edge v${VISION_EDGE_VERSION}..."
+
+vision_edge_runtime_valid() {
+  local package_hash model_hash receipt_hash
+
+  [[ -d "$VISION_EDGE_DIR" && ! -L "$VISION_EDGE_DIR" ]] || return 1
+  [[ -x "${VISION_EDGE_DIR}/.venv/bin/python" ]] || return 1
+  [[ -f "${VISION_EDGE_DIR}/phenocam/__init__.py" ]] || return 1
+  [[ ! -L "${VISION_EDGE_DIR}/phenocam/__init__.py" ]] || return 1
+  [[ -f "${VISION_EDGE_DIR}/models/yolo26n-phenocam.onnx" ]] || return 1
+  [[ ! -L "${VISION_EDGE_DIR}/models/yolo26n-phenocam.onnx" ]] || return 1
+  [[ -f "${VISION_EDGE_DIR}/models/yolo26n-phenocam.json" ]] || return 1
+  [[ ! -L "${VISION_EDGE_DIR}/models/yolo26n-phenocam.json" ]] || return 1
+
+  package_hash="$(sha256sum "${VISION_EDGE_DIR}/phenocam/__init__.py" | awk '{print $1}')"
+  model_hash="$(sha256sum "${VISION_EDGE_DIR}/models/yolo26n-phenocam.onnx" | awk '{print $1}')"
+  receipt_hash="$(sha256sum "${VISION_EDGE_DIR}/models/yolo26n-phenocam.json" | awk '{print $1}')"
+  [[ "$package_hash" == "$VISION_EDGE_PACKAGE_INIT_SHA256" ]] || return 1
+  [[ "$model_hash" == "$VISION_EDGE_MODEL_SHA256" ]] || return 1
+  [[ "$receipt_hash" == "$VISION_EDGE_RECEIPT_SHA256" ]]
+}
+
+if vision_edge_runtime_valid; then
+  log_ok "Phenocam Vision Edge v${VISION_EDGE_VERSION} already installed and verified"
+elif sudo test -e "$VISION_EDGE_DIR" || sudo test -L "$VISION_EDGE_DIR"; then
+  log_fatal "Existing ${VISION_EDGE_DIR} failed validation. Remove or repair it before reinstalling."
+else
+  VISION_EDGE_TMP="$(mktemp -d -t phenocam-vision-edge.XXXXXXXX)" \
+    || log_fatal "Could not create the Vision Edge temporary directory."
+  VISION_EDGE_ARCHIVE="${VISION_EDGE_TMP}/${VISION_EDGE_PACKAGE}.tar.gz"
+  VISION_EDGE_SOURCE="${VISION_EDGE_TMP}/${VISION_EDGE_PACKAGE}"
+
+  cleanup_vision_edge_tmp() {
+    if [[ -n "${VISION_EDGE_TMP:-}" && -d "$VISION_EDGE_TMP" && \
+          "$VISION_EDGE_TMP" == /tmp/phenocam-vision-edge.* ]]; then
+      rm -rf -- "$VISION_EDGE_TMP"
+    fi
+  }
+  trap cleanup_vision_edge_tmp EXIT
+
+  curl --fail --location --silent --show-error \
+    --output "$VISION_EDGE_ARCHIVE" \
+    "$VISION_EDGE_URL" \
+    || log_fatal "Phenocam Vision Edge download failed."
+
+  printf '%s  %s\n' "$VISION_EDGE_ARCHIVE_SHA256" "$VISION_EDGE_ARCHIVE" \
+    | sha256sum -c - >/dev/null \
+    || log_fatal "Phenocam Vision Edge archive checksum mismatch."
+  log_ok "Phenocam Vision Edge archive checksum verified"
+
+  (umask 022; tar -xzf "$VISION_EDGE_ARCHIVE" -C "$VISION_EDGE_TMP") \
+    || log_fatal "Phenocam Vision Edge archive extraction failed."
+
+  [[ -d "$VISION_EDGE_SOURCE" && ! -L "$VISION_EDGE_SOURCE" ]] \
+    || log_fatal "Phenocam Vision Edge package directory is invalid."
+  [[ -x "${VISION_EDGE_SOURCE}/scripts/installer.sh" && \
+     ! -L "${VISION_EDGE_SOURCE}/scripts/installer.sh" ]] \
+    || log_fatal "Phenocam Vision Edge installer is invalid."
+
+  (umask 022; PATH=/usr/bin:/bin "${VISION_EDGE_SOURCE}/scripts/installer.sh") \
+    || log_fatal "Phenocam Vision Edge runtime installation failed."
+
+  sudo mv -- "$VISION_EDGE_SOURCE" "$VISION_EDGE_DIR"
+  sudo chown -R root:root "$VISION_EDGE_DIR"
+  sudo chmod -R a+rX,go-w "$VISION_EDGE_DIR"
+
+  cleanup_vision_edge_tmp
+  trap - EXIT
+
+  vision_edge_runtime_valid \
+    || log_fatal "Installed Phenocam Vision Edge runtime failed validation."
+  log_ok "Phenocam Vision Edge v${VISION_EDGE_VERSION} installed and verified"
+fi
+
+# ── Step 6 — Enable camera ────────────────────────────────────────────────────
 log_step "Enabling camera interface..."
 
 # vcgencmd get_camera is kept as a lightweight compatibility check.
@@ -232,7 +338,7 @@ else
   log_warn "After reboot, run: sudo /usr/local/lib/phenocam/bin/diag_camera.sh"
 fi
 
-# ── Step 5b — Detect hardware board ───────────────────────────────────────────
+# ── Step 6b — Detect hardware board ──────────────────────────────────────────
 log_step "Detecting hardware board..."
 
 BOARD_RAW="$(grep -i "Model" /proc/cpuinfo | tail -1 || true)"
@@ -247,7 +353,7 @@ fi
 
 log_ok "Board detected: $DETECTED_BOARD ($BOARD_RAW)"
 
-# ── Step 6 — Deploy software ──────────────────────────────────────────────────
+# ── Step 7 — Deploy software ──────────────────────────────────────────────────
 log_step "Deploying software..."
 
 # Create system user.
@@ -279,9 +385,11 @@ log_ok "Config directory group set to phenocam"
 
 # Copy scripts.
 sudo cp "${SOFTWARE_DIR}/scripts/"*.sh "${LIB_DIR}/scripts/"
+sudo cp "${SOFTWARE_DIR}/scripts/"*.py "${LIB_DIR}/scripts/"
 sudo cp "${SOFTWARE_DIR}/bin/"*.sh     "${LIB_DIR}/bin/"
 sudo chmod +x "${LIB_DIR}/bin/"*.sh "${LIB_DIR}/scripts/"*.sh
-log_ok "Scripts deployed and made executable ($(find "${LIB_DIR}" -name "*.sh" | wc -l) files)"
+sudo chmod 644 "${LIB_DIR}/scripts/"*.py
+log_ok "Runtime scripts deployed"
 
 # Copy local documentation if present.
 if [[ -d "${SOFTWARE_DIR}/docs" ]]; then
@@ -333,7 +441,7 @@ sudo chown phenocam:phenocam \
 
 log_ok "Permissions set"
 
-# ── Step 7 — Create configuration templates ───────────────────────────────────
+# ── Step 8 — Create configuration templates ──────────────────────────────────
 log_step "Creating configuration files..."
 
 # settings.txt — create only if not already present.
@@ -362,6 +470,8 @@ nd
 unknown
 imx708
 30000
+off
+privacy
 SETTINGS
 
   log_ok "settings.txt created (edit to set your SITENAME and parameters)"
@@ -454,7 +564,7 @@ echo ""
 sudo cat "${CONFIG_DIR}/keys/phenocam_key.pub"
 echo ""
 
-# ── Step 8 — Install systemd units and udev rules ─────────────────────────────
+# ── Step 9 — Install systemd units and udev rules ─────────────────────────────
 log_step "Installing systemd units and udev rules..."
 
 # Copy systemd units.
@@ -484,7 +594,7 @@ log_ok "udev rule installed and reloaded (USB hot-plug enabled)"
 sudo systemctl daemon-reload
 log_ok "systemd daemon reloaded"
 
-# ── Step 9 — Enable runtime RAMDISK init and production timers ────────────────
+# ── Step 10 — Enable runtime RAMDISK init and production timers ───────────────
 log_step "Enabling PhenoCam RAMDISK init..."
 
 sudo systemctl enable --now phenocam-init.service
@@ -522,7 +632,7 @@ else
   log_warn "Timers are enabled for the next boot. They are not forced to run immediately by the installer."
 fi
 
-# ── Step 10 — Final report ────────────────────────────────────────────────────
+# ── Step 11 — Final report ────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}${BOLD}═══════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}${BOLD}  Installation complete — PhenoCam v$(cat "${SOFTWARE_DIR}/VERSION")${NC}"
