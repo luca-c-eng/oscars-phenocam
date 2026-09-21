@@ -1,4 +1,4 @@
-# OSCARS-PHENOCAM dev/v1.7.0 settings example
+# OSCARS-PHENOCAM dev/v1.8.0 settings example
 #
 # Positional format: one effective value per field.
 # Blank lines and comment lines are ignored.
