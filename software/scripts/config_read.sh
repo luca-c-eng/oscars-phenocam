@@ -80,6 +80,10 @@ read_settings() {
   CAMERA_MODEL="${L[21]:-imx708}"          # imx708 | imx708_noir
   CAPTURE_TIMEOUT="${L[22]:-30000}"        # ms; default validated on RPi 3B+ and Zero 2W
 
+  # v1.8.0 — Phenocam Vision Edge integration fields
+  VISION_EDGE_ENABLED="${L[23]:-off}"      # on | off
+  VISION_EDGE_MODE="${L[24]:-privacy}"     # metadata | annotated | privacy | delete
+
   # Defensive defaults: never export an invalid capture timeout.
   [[ "$CAPTURE_TIMEOUT" =~ ^[0-9]+$ ]] || CAPTURE_TIMEOUT="30000"
 
@@ -91,6 +95,22 @@ read_settings() {
   export USB_MOUNT_BASES USB_MAX_USED_PCT REMOTE_LAYOUT
   export SITE_LAT SITE_LON SITE_ELEV_M SITE_START_DATE SITE_END_DATE SITE_NIMAGE
   export BOARD CAMERA_MODEL CAPTURE_TIMEOUT
+  export VISION_EDGE_ENABLED VISION_EDGE_MODE
+}
+
+# validate_vision_edge_settings — reject unsupported detection values.
+# Kept separate from read_settings so a detection-only configuration error
+# cannot stop capture cycles from continuing to enqueue image/metadata pairs.
+validate_vision_edge_settings() {
+  case "${VISION_EDGE_ENABLED:-off}" in
+    on|off) ;;
+    *) return 1 ;;
+  esac
+
+  case "${VISION_EDGE_MODE:-privacy}" in
+    metadata|annotated|privacy|delete) ;;
+    *) return 2 ;;
+  esac
 }
 
 # within_window — returns 0 if current hour is within [START_HOUR, END_HOUR).
