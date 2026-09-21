@@ -71,6 +71,8 @@ nd
 unknown
 imx708
 30000
+off
+privacy
 ```
 
 ## Settings Reference
@@ -100,8 +102,13 @@ imx708
 |   21 | `BOARD`            | detected value or `unknown` | Read and exported, but not consumed by the runtime scripts            |
 |   22 | `CAMERA_MODEL`     | `imx708`                    | Read and exported, but not consumed by the runtime scripts            |
 |   23 | `CAPTURE_TIMEOUT`  | `30000`                     | Camera warm-up time in milliseconds                                   |
+|   24 | `VISION_EDGE_ENABLED` | `off`                    | Enables (`on`) or disables (`off`) detection                           |
+|   25 | `VISION_EDGE_MODE` | `privacy`                   | Selects `metadata`, `annotated`, `privacy` or `delete`                 |
 
 The first six effective values are mandatory. Later values use internal defaults when they are absent.
+
+Existing 23-field configuration files remain valid. When positions 24 and 25
+are absent, the software uses `off` and `privacy` respectively.
 
 A non-numeric `CAPTURE_TIMEOUT` is replaced with `30000`.
 
@@ -172,6 +179,53 @@ sudo systemctl restart phenocam-capture.timer
 ```
 
 Position 6 must remain in `settings.txt` even when the timer is overridden.
+
+---
+
+## Vision Edge Detection
+
+Phenocam Vision Edge v0.2.3 is installed by `install.sh`. Detection is executed
+from the upload cycle, inside the existing upload lock and before the Internet
+availability check.
+
+`VISION_EDGE_ENABLED` accepts only:
+
+| Value | Behaviour |
+| ----- | --------- |
+| `off` | Does not run inference. The queued pair is marked as detection-disabled and becomes eligible for upload. |
+| `on`  | Runs Vision Edge on each queued pair that has not already completed detection. |
+
+`VISION_EDGE_MODE` accepts only:
+
+| Value       | Vision Edge action |
+| ----------- | ------------------ |
+| `metadata`  | Updates detection metadata without modifying the JPEG. |
+| `annotated` | Replaces the queued JPEG with the annotated image when an enabled detection exists. |
+| `privacy`   | Replaces the queued JPEG with the privacy-blurred image when an enabled detection exists. |
+| `delete`    | Deletes the queued JPEG and metadata only when an enabled detection exists. |
+
+When detection is `off`, the selected mode is still recorded in the metadata as
+`filter_mode`; no inference action is performed.
+
+When `annotated`, `privacy` or `delete` produces no enabled detection, the
+original JPEG remains queued and the metadata records a completed negative
+result.
+
+The mode is selected internally from this fixed list. Configuration values are
+never evaluated as shell commands or forwarded as arbitrary command-line
+arguments.
+
+Detection state is stored in the pair's `.meta` file. Later cycles skip pairs
+already marked `off` or `ready`. Therefore, changing positions 24 or 25 affects
+only pairs that have not yet completed detection.
+
+Pairs already present during an upgrade from v1.7.0 have no detection state and
+are processed using the effective v1.8.0 configuration. With an unchanged
+23-field file, the backward-compatible default is `off`.
+
+An unsupported value in either position stops the upload cycle before queue
+processing. Capture remains active because detection validation is deliberately
+separate from general settings loading.
 
 ---
 
@@ -360,4 +414,4 @@ For service management and runtime checks, see [Operations](OPERATIONS.md).
 
 ---
 
-[Clean installation](CLEAN_INSTALL.md) · [Back to the project README](../../README.md)
+[Clean installation](CLEAN_INSTALL.md) Â· [Back to the project README](../../README.md)
