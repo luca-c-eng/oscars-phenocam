@@ -74,6 +74,33 @@ detection_manager tests: OK
 
 Any failed assertion produces a non-zero exit status.
 
+## Upload Readiness Gate
+
+The upload-gate test suite covers the readiness check in
+[`uploader_daemon.sh`](../scripts/uploader_daemon.sh).
+
+Run:
+
+```bash
+bash software/tests/test_upload_gate.sh
+```
+
+The suite verifies:
+
+- retention of pairs that have not completed detection;
+- suppression of network, SFTP, and FTP calls for those pairs;
+- normal upload and removal of ready pairs;
+- retention of both files when an enabled upload target fails.
+
+The test uses isolated temporary files and does not require network access. A
+successful run exits with status `0` and prints:
+
+```text
+upload gate tests: OK
+```
+
+Any failed assertion produces a non-zero exit status.
+
 ---
 
 [Back to the project README](../../README.md)
