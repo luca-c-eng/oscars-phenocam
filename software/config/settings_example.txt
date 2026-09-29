@@ -29,7 +29,7 @@ UTC+1
 22
 
 # 6 INTERVAL_MIN
-# Required and exported, but not used by the v1.7.0 capture timer.
+# Required and exported, but not used by the capture timer.
 30
 
 # 7 IFACE
