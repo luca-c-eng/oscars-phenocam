@@ -1,6 +1,7 @@
 # Troubleshooting
 
-This guide covers failures and runtime conditions directly handled or reported by OSCARS-PHENOCAM `dev/v1.7.0`.
+This guide covers failures and runtime conditions directly handled or reported
+by OSCARS-PHENOCAM `dev/v1.8.0`.
 
 For routine commands, see [Operations](OPERATIONS.md).
 
@@ -44,7 +45,7 @@ The installer refuses to run when the current user is `root`.
 Run it as a regular user with `sudo` privileges:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.7.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.8.0/install.sh | bash
 ```
 
 Do not prefix this command with `sudo`.
@@ -79,7 +80,49 @@ flock
 /usr/sbin/runuser
 ```
 
-The installer installs `git` and `libimage-exiftool-perl`.
+The installer installs `git`, `libimage-exiftool-perl` and `python3-venv` when
+required. It then requires `/usr/bin/python3` to be Python 3.13 and verifies
+that the `venv` module can be imported.
+
+The Vision Edge installation step also invokes `mktemp`, `sha256sum` and `tar`
+directly.
+
+### Phenocam Vision Edge Installation Fails
+
+The installer downloads only Phenocam Vision Edge v0.2.3 and verifies the
+archive against the SHA-256 value fixed in `install.sh`.
+
+Installation stops if:
+
+* the v0.2.3 archive cannot be downloaded;
+* the archive checksum does not match;
+* archive extraction fails;
+* the extracted package directory or installer is invalid;
+* the upstream installer returns an error;
+* the installed package, model or model receipt fails validation.
+
+The expected runtime location is:
+
+```text
+/opt/phenocam-vision-edge-0.2.3
+```
+
+An existing file, directory or symbolic link at that path stops installation
+when it does not pass validation. Inspect the path before deciding whether it
+must be repaired or removed:
+
+```bash
+sudo ls -ld /opt/phenocam-vision-edge-0.2.3
+sudo ls -l \
+  /opt/phenocam-vision-edge-0.2.3/.venv/bin/python \
+  /opt/phenocam-vision-edge-0.2.3/phenocam/__init__.py \
+  /opt/phenocam-vision-edge-0.2.3/models/yolo26n-phenocam.onnx \
+  /opt/phenocam-vision-edge-0.2.3/models/yolo26n-phenocam.json
+```
+
+The installer verifies fixed hashes for the installed package entry point,
+model and model receipt. Replacing any of these files makes the runtime fail a
+later installer validation.
 
 ---
 
@@ -196,7 +239,7 @@ The same acquisition-window check is applied. When the station is outside the wi
 
 ---
 
-## Capture or Upload Reports a Lock Error
+## Capture or Queue Processing Reports a Lock Error
 
 The software uses separate non-blocking locks:
 
@@ -215,6 +258,116 @@ systemctl status phenocam-upload.service
 ```
 
 A lock file may remain on the filesystem after execution. Its presence does not prove that the lock is currently held.
+
+---
+
+## Detection or Upload Service Fails Before Queue Processing
+
+Inspect the service and application log:
+
+```bash
+sudo systemctl status phenocam-upload.service
+sudo journalctl -u phenocam-upload.service -n 100 --no-pager
+sudo tail -n 100 /var/log/phenocam/phenocam.log
+```
+
+The upload entry point can stop before per-pair processing for these reasons:
+
+| Exit status | Code condition | Result |
+| ----------- | -------------- | ------ |
+| `2` | `settings.txt` is missing or invalid | Service exits before detection |
+| `3` | `VISION_EDGE_ENABLED` or `VISION_EDGE_MODE` is unsupported | Service exits before detection |
+| `4` | `/usr/bin/python3` or `detection_metadata.py` fails its runtime checks | Service exits before scanning the queues |
+
+Only `on` and `off` are accepted for `VISION_EDGE_ENABLED`. Only `metadata`,
+`annotated`, `privacy` and `delete` are accepted for `VISION_EDGE_MODE`.
+
+Detection-specific validation is intentionally performed only by the upload
+service. An invalid Vision Edge setting does not stop capture from creating new
+queued pairs.
+
+An error affecting one pair does not stop the remaining detection scan. The
+affected pair remains ineligible for upload unless `delete` recovery completes
+its requested removal.
+
+---
+
+## Detection Does Not Complete
+
+Detection runs at the beginning of `phenocam-upload.service`, before upload
+configuration and Internet-route checks. Lack of connectivity does not prevent
+detection from running.
+
+Inspect one queued metadata file without changing it:
+
+```bash
+sudo /usr/bin/python3 \
+  /usr/local/lib/phenocam/scripts/detection_metadata.py \
+  status --meta /path/to/image.meta
+```
+
+| Reported state | Meaning | Manager action |
+| -------------- | ------- | -------------- |
+| `pending` | No `[detection]` section exists | Applies the current detection configuration |
+| `vision` | Vision Edge metadata exists without the two OSCARS fields | Validates the result and attempts to complete the section |
+| `off` | Detection was disabled for this pair | Skips detection; pair is upload-ready |
+| `ready` | Enabled detection completed and was validated | Skips detection; pair is upload-ready |
+
+An invalid file returns:
+
+```text
+error: detection metadata is invalid
+```
+
+and a non-zero status. The pair is not uploaded.
+
+### Detection Runtime Is Unavailable
+
+When detection is enabled, the manager requires:
+
+```text
+/opt/phenocam-vision-edge-0.2.3/.venv/bin/python
+/opt/phenocam-vision-edge-0.2.3/models/yolo26n-phenocam.onnx
+/opt/phenocam-vision-edge-0.2.3/models/yolo26n-phenocam.json
+```
+
+The Python executable must be executable. The model and receipt must be regular
+files and must not be symbolic links.
+
+If these checks fail, the application log contains:
+
+```text
+Phenocam Vision Edge runtime is unavailable
+```
+
+The affected pending pairs remain queued and are not eligible for upload.
+
+### Detection Metadata Is Rejected
+
+The metadata tool rejects unsafe or inconsistent input, including:
+
+* duplicate `[detection]` sections or duplicate fields;
+* an incomplete `filter_enabled` and `filter_mode` pair;
+* unsupported filter values;
+* incorrect Vision Edge software or model identity;
+* inconsistent classes, class counts or `total_count`;
+* output filenames that do not match the selected mode;
+* a metadata path that is not a regular `.meta` file;
+* symbolic links;
+* a file replaced while an atomic update is in progress.
+
+The corresponding log message identifies the affected basename. For the exact
+field rules, see [Metadata](METADATA.md).
+
+### Detection Output Is Not a Separate File
+
+In `annotated` and `privacy` modes, a positive result atomically replaces the
+queued JPEG. A negative result keeps the original JPEG. No permanent image with
+a second output name is created.
+
+In `delete` mode, a positive result removes both the JPEG and `.meta` file. If
+the JPEG was removed but the `.meta` file remains after an interrupted delete,
+the manager removes the remaining metadata file to complete the operation.
 
 ---
 
@@ -247,6 +400,9 @@ Code-level causes include:
 * no route to `1.1.1.1`;
 * no effective FTP or SFTP configuration;
 * invalid `settings.txt`;
+* invalid `VISION_EDGE_ENABLED` or `VISION_EDGE_MODE`;
+* unavailable detection metadata runtime;
+* a queued pair whose detection state is not `off` or `ready`;
 * missing SFTP username;
 * missing SFTP private key;
 * missing `known_hosts`;
@@ -320,6 +476,8 @@ Queued files are retained when:
 
 * no route to `1.1.1.1` is available;
 * no upload method is configured;
+* detection is pending or its result is invalid;
+* the enabled Vision Edge runtime is unavailable for a pending pair;
 * an enabled SFTP or FTP attempt fails;
 * one of several enabled destinations fails;
 * a final `.meta` file has no matching `.jpg`.
@@ -333,10 +491,10 @@ sudo ls -lah /run/phenocam/queue
 sudo ls -lah /var/lib/phenocam/queue
 ```
 
-The uploader processes available queues in this order:
+The detection manager and uploader process available queues in this order:
 
 ```text
-USB → SD → RAM
+USB -> SD -> RAM
 ```
 
 ---
@@ -450,5 +608,4 @@ When `BUILD_INFO` is unavailable, metadata generation reads `VERSION` when possi
 
 ---
 
-[Configuration](CONFIGURATION.md) · [Operations](OPERATIONS.md) · [Software Architecture](ARCHITECTURE.md) · [Back to the project README](../../README.md)
-
+[Configuration](CONFIGURATION.md) | [Operations](OPERATIONS.md) | [Software Architecture](ARCHITECTURE.md) | [Back to the project README](../../README.md)
