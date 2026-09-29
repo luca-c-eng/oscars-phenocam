@@ -1,4 +1,4 @@
-# server.txt — SFTP server list
+# server.txt - SFTP server list
 # Leave this file /etc/phenocam/server.txt empty or comment-only to disable SFTP.
 # Add one hostname/IP per non-comment line to enable SFTP.
 
