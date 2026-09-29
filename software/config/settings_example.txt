@@ -1,4 +1,5 @@
 # OSCARS-PHENOCAM dev/v1.8.0 settings example
+# Required and exported, but not used by the capture timer.
 #
 # Positional format: one effective value per field.
 # Blank lines and comment lines are ignored.
