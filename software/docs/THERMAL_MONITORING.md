@@ -50,11 +50,14 @@ If the sysfs file is unavailable, the software attempts:
 vcgencmd measure_temp
 ```
 
-If neither source is available:
+If the sysfs file is unavailable and `vcgencmd` is not installed:
 
 ```text
 soc_temp_c=nd
 ```
+
+The fallback output is not otherwise validated. If `vcgencmd` exists but
+returns empty or unexpected text, that result is not normalized to `nd`.
 
 Health values are collected after JPEG acquisition, while the metadata sidecar is being generated.
 
@@ -66,11 +69,11 @@ Health values are collected after JPEG acquisition, while the metadata sidecar i
 
 | Temperature     | Diagnostic text            |
 | --------------- | -------------------------- |
-| Below 60 °C     | Normal                     |
-| 60–70 °C        | Warm, generally acceptable |
-| 70–80 °C        | Monitor                    |
-| 80–85 °C        | ARM throttling may occur   |
-| 85 °C or higher | Stronger throttling risk   |
+| Below 60 C      | Normal                     |
+| 60-70 C         | Warm, generally acceptable |
+| 70-80 C         | Monitor                    |
+| 80-85 C         | ARM throttling may occur   |
+| 85 C or higher  | Stronger throttling risk   |
 
 These ranges are printed for interpretation only. No conditional action in the software uses them.
 
@@ -90,11 +93,15 @@ The `throttled=` prefix is removed and the result is recorded as:
 throttled_hex=<value>
 ```
 
-If `vcgencmd` is unavailable:
+If `vcgencmd` is not installed:
 
 ```text
 throttled_hex=nd
 ```
+
+The raw fallback output is not otherwise validated. Empty or unexpected text is
+not normalized in `throttled_hex`; the decoded fields contain `nd` whenever the
+result is not valid hexadecimal input.
 
 A value of:
 
@@ -205,5 +212,4 @@ For the complete sidecar format, see [Metadata](METADATA.md).
 
 ---
 
-[Operations](OPERATIONS.md) · [Back to the project README](../../README.md)
-
+[Operations](OPERATIONS.md) | [Back to the project README](../../README.md)
