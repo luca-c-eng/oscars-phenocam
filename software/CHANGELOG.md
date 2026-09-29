@@ -1,6 +1,56 @@
 # Changelog
 
-Code changes between OSCARS-PHENOCAM versions `1.3.0` and `dev/v1.7.0`.
+Changes between OSCARS-PHENOCAM versions `1.3.0` and `dev/v1.8.0`.
+
+The v1.8.0 section is derived from the Git difference between
+`dev/v1.7.0` and `dev/v1.8.0`.
+
+## [dev/v1.8.0]
+
+### Added
+
+* Optional integration with Phenocam Vision Edge v0.2.3.
+* Installation of the Vision Edge runtime in `/opt/phenocam-vision-edge-0.2.3`.
+* `VISION_EDGE_ENABLED` as settings field 24, accepting only `on` or `off` and defaulting to `off`.
+* `VISION_EDGE_MODE` as settings field 25, accepting only `metadata`, `annotated`, `privacy` or `delete` and defaulting to `privacy`.
+* `detection_manager.sh` for processing queued pairs before upload.
+* `detection_metadata.py` for validating and atomically maintaining detection state in the existing `.meta` file.
+* Detection states `pending`, `vision`, `off` and `ready`, without a separate marker file.
+* Recovery of a valid Vision Edge metadata result that has not yet received the OSCARS integration fields.
+* Recovery of delete mode when the JPEG was removed but its `.meta` file remains.
+* Upload eligibility checks that accept only `off` and `ready` pairs.
+* Unit and shell tests for detection metadata, queue processing, upload eligibility and Vision Edge configuration.
+* `TESTING.md` with the commands and scope of the v1.8.0 test suites.
+
+### Changed
+
+* `phenocam-upload.sh` now validates the Vision Edge configuration, processes detection and then drains upload queues under the existing `upload.lock`.
+* Detection runs in USB, SD and RAM order before upload-method and Internet-route checks.
+* Completed `off` and `ready` pairs are skipped by later detection cycles; pending pairs can be retried.
+* `metadata` mode retains the original JPEG and records the detection result.
+* Positive `annotated` and `privacy` results atomically replace the queued JPEG using the same filename; negative results retain the original JPEG.
+* Positive `delete` results remove the queued JPEG and metadata pair; negative results retain the pair.
+* The uploader postpones pairs whose detection metadata is missing, incomplete or invalid.
+* Existing 23-field settings files remain valid and receive the `off` and `privacy` defaults internally.
+* Detection-setting validation is separate from general settings loading, so invalid detection-only values do not stop capture from queuing new pairs.
+* New configuration files created by the installer contain `off` and `privacy` as fields 24 and 25; existing configuration files are not overwritten.
+* The runtime version marker is `dev/v1.8.0`.
+* The installer deploys Python runtime scripts in addition to shell scripts.
+* Project documentation now describes the v1.8.0 installation, configuration, architecture, metadata, operations, tests and failure handling.
+
+The capture entry point, capture timer, queue-selection logic and
+`capture.lock` are unchanged by the Vision Edge integration.
+
+### Security
+
+* Vision Edge configuration values are selected through fixed allowlists and are not passed to a general shell evaluator.
+* The installer requires Python 3.13 and verifies `python3-venv` before installing Vision Edge.
+* The Vision Edge v0.2.3 archive is verified against a SHA-256 value fixed in `install.sh`.
+* The installed package entry point, model and model receipt are verified against fixed SHA-256 values.
+* The Vision Edge source installer must be executable and not a symbolic link.
+* The installed runtime is assigned to `root:root` and external write permissions are removed.
+* Detection metadata updates use a temporary file and `os.replace`, preserve the original file mode and reject symbolic links or a replaced source file.
+* Detection metadata validation rejects duplicate sections or fields, unsupported values, incorrect software or model identity, inconsistent class counts and outputs that do not match the selected mode.
 
 ## [dev/v1.7.0]
 
@@ -77,4 +127,3 @@ Code changes between OSCARS-PHENOCAM versions `1.3.0` and `dev/v1.7.0`.
 ## [1.3.0]
 
 Initial comparison baseline for this changelog.
-
