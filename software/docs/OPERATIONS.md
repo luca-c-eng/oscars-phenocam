@@ -1,6 +1,6 @@
 # Operations
 
-This guide describes the routine operation of OSCARS-PHENOCAM `dev/v1.7.0`.
+This guide describes the routine operation of OSCARS-PHENOCAM `dev/v1.8.0`.
 
 For initial setup, see:
 
@@ -20,9 +20,11 @@ For initial setup, see:
 | `phenocam-capture.timer`         | Schedules regular capture cycles        |
 | `phenocam-capture.service`       | Runs one acquisition cycle              |
 | `phenocam-upload.timer`          | Schedules regular upload cycles         |
-| `phenocam-upload.service`        | Processes the configured queues         |
+| `phenocam-upload.service`        | Runs queue detection followed by upload |
 
-Capture and upload use separate services and separate lock files.
+Capture and queue processing use separate services and separate lock files.
+Detection and upload run sequentially inside the upload service and share one
+lock. There is no separate detection service or timer.
 
 ---
 
@@ -104,15 +106,31 @@ Check the result:
 sudo systemctl status phenocam-capture.service
 ```
 
-### Process Upload Queues
+### Process Detection and Upload Queues
 
 ```bash
 sudo systemctl start phenocam-upload.service
 ```
 
-The service reads the current configuration and processes USB, SD and RAM queues.
+The service:
 
-If no route or no upload method is available at the start of the cycle, queued files remain in place.
+1. reads the current settings;
+2. validates `VISION_EDGE_ENABLED` and `VISION_EDGE_MODE`;
+3. processes detection in USB, SD and RAM queues;
+4. determines which upload methods are effectively configured;
+5. checks for an Internet route;
+6. attempts to upload eligible pairs.
+
+Detection runs before upload configuration and Internet-route checks. Pending
+pairs can therefore be processed while the station is offline or has no upload
+destination configured.
+
+Pairs already marked `off` or `ready` are not processed again. Except for the
+partial-delete recovery described below, a pair remains queued and is not
+eligible for upload when detection or detection-result validation fails.
+
+If no route or no upload method is available, processed pairs remain queued for
+a later upload cycle.
 
 Check the result:
 
@@ -165,13 +183,15 @@ Disabling timers does not delete queued files.
 | SD      | `/var/lib/phenocam/queue`     | Persistent fallback                                  |
 | Staging | `/run/phenocam/staging`       | JPEG and metadata generation before queue selection  |
 
-The uploader processes available queues in this order:
+The detection manager and uploader process available queues in this order:
 
 ```text
-USB → SD → RAM
+USB -> SD -> RAM
 ```
 
-Queue work is discovered from final `.meta` files. A pair is uploaded only when the corresponding final `.jpg` exists.
+Queue work is discovered from final `.meta` files. A pair is uploaded only when
+the corresponding final `.jpg` exists and its detection state is `off` or
+`ready`.
 
 Check RAM-backed storage:
 
@@ -191,14 +211,20 @@ The RAM queue and staging directory are located on `tmpfs`. Their contents are l
 
 ## Concurrency Protection
 
-Capture and upload use separate non-blocking locks:
+Capture and queue processing use separate non-blocking locks:
 
 ```text
 /run/phenocam/capture.lock
 /run/phenocam/upload.lock
 ```
 
-A second instance of the same operation exits with an error while the corresponding lock is held.
+A second instance of the same operation exits with an error while the
+corresponding lock is held.
+
+`upload.lock` covers both detection and upload. A pair cannot be processed by a
+second upload-service instance between these two phases. Capture can continue
+under `capture.lock`; a pair published after the detection scan remains pending
+until the next upload-service cycle.
 
 The presence of a lock file alone does not indicate that the lock is active.
 
@@ -218,6 +244,80 @@ Queue insertion uses:
 The JPEG is renamed to its final name first. The metadata file is renamed last and acts as the signal used by the uploader to discover the pair.
 
 For the complete sequence, see [Software Architecture](ARCHITECTURE.md).
+
+---
+
+## Detection Processing
+
+Detection behavior is controlled by:
+
+```text
+VISION_EDGE_ENABLED=on|off
+VISION_EDGE_MODE=metadata|annotated|privacy|delete
+```
+
+Configuration files with only the original 23 effective fields remain valid.
+They default to detection `off` and mode `privacy`.
+
+When detection is disabled, the manager does not invoke Phenocam Vision Edge.
+It appends a validated `[detection]` section with `filter_enabled=off` and the
+configured mode.
+
+When detection is enabled, the manager invokes the installed Vision Edge
+v0.2.3 runtime from:
+
+```text
+/opt/phenocam-vision-edge-0.2.3
+```
+
+The queued JPEG is supplied as the input. Vision Edge updates the existing
+`.meta` file, after which OSCARS-PHENOCAM validates the result and inserts
+`filter_enabled=on` and the effective mode.
+
+| Mode        | Operational result |
+| ----------- | ------------------ |
+| `metadata`  | Keeps the queued JPEG and records the validated detection result. |
+| `annotated` | On a positive detection, atomically replaces the queued JPEG with its annotated form. A negative result keeps the original JPEG. |
+| `privacy`   | On a positive detection, atomically replaces the queued JPEG with its privacy-blurred form. A negative result keeps the original JPEG. |
+| `delete`    | On a positive detection, removes both queued files. A negative result keeps the pair and records the validated result. |
+
+The integration does not create permanent output images with separate names.
+For `annotated` and `privacy`, the output target is the same queued JPEG name.
+
+In `delete` mode, if Vision Edge removes the JPEG but exits before removing its
+metadata file, the manager removes the remaining `.meta` file to complete the
+requested pair deletion.
+
+### Detection States
+
+The `.meta` file is the only persistent processing marker.
+
+| State     | Meaning | Upload eligible |
+| --------- | ------- | --------------- |
+| `pending` | No `[detection]` section exists. | No |
+| `vision`  | Vision Edge wrote a valid result, but OSCARS fields are not yet present. | No |
+| `off`     | Detection was disabled and the OSCARS fields are valid. | Yes |
+| `ready`   | Detection and final metadata validation completed. | Yes |
+
+The `vision` state permits recovery if Vision Edge completed its metadata write
+but the manager stopped before inserting the OSCARS fields. No separate marker
+file is created.
+
+Pairs already present in a queue after an upgrade are initially `pending` and
+are processed using the current v1.8.0 detection settings.
+
+Inspect one metadata file without modifying it:
+
+```bash
+sudo /usr/bin/python3 \
+  /usr/local/lib/phenocam/scripts/detection_metadata.py \
+  status --meta /path/to/image.meta
+```
+
+The command prints `pending`, `vision`, `off` or `ready`. Invalid detection
+metadata is rejected with a non-zero exit status.
+
+For field definitions and validation rules, see [Metadata](METADATA.md).
 
 ---
 
@@ -260,7 +360,7 @@ The detach handler can perform a lazy unmount when a registered mountpoint is no
 
 ## Application Log
 
-Application events are appended to:
+Capture, detection and upload events are appended to:
 
 ```text
 /var/log/phenocam/phenocam.log
@@ -368,4 +468,4 @@ Displays the software name, version, branch, commit and installation timestamp r
 
 ---
 
-[Configuration](CONFIGURATION.md) · [Troubleshooting](TROUBLESHOOTING.md) · [Back to the project README](../../README.md)
+[Configuration](CONFIGURATION.md) | [Troubleshooting](TROUBLESHOOTING.md) | [Back to the project README](../../README.md)
