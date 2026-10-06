@@ -94,8 +94,8 @@ build_meta() {
     print_system_health_kv
     echo ""
     echo "[capture_params_fixed]"
-    echo "width=${WIDTH:-4608}"
-    echo "height=${HEIGHT:-2592}"
+    echo "width=${WIDTH:-2304}"
+    echo "height=${HEIGHT:-1296}"
     echo "awb=${AWB:-daylight}"
     echo "gain=${GAIN:-1.0}"
     echo "sharpness=${SHARP:-1.0}"
