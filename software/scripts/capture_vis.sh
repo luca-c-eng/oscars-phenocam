@@ -33,8 +33,8 @@ capture_vis() {
   command -v timeout >/dev/null 2>&1 || return 11
 
   # Capture parameters. Defaults mirror the validated Camera Module 3 setup.
-  local WIDTH="${WIDTH:-4608}"
-  local HEIGHT="${HEIGHT:-2592}"
+  local WIDTH="${WIDTH:-2304}"
+  local HEIGHT="${HEIGHT:-1296}"
   local AWB="${AWB:-daylight}"
   local GAIN="${GAIN:-1.0}"
   local SHARP="${SHARP:-1.0}"
