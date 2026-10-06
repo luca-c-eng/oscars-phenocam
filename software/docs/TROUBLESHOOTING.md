@@ -1,7 +1,7 @@
 # Troubleshooting
 
 This guide covers failures and runtime conditions directly handled or reported
-by OSCARS-PHENOCAM `dev/v1.8.0`.
+by OSCARS-PHENOCAM `dev/v0.1.0`.
 
 For routine commands, see [Operations](OPERATIONS.md).
 
@@ -45,7 +45,7 @@ The installer refuses to run when the current user is `root`.
 Run it as a regular user with `sudo` privileges:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.8.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v0.1.0/install.sh | bash
 ```
 
 Do not prefix this command with `sudo`.
