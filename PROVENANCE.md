@@ -41,16 +41,15 @@ ICOS compatibility remains a development and validation objective until the requ
 * Documentation
 * System integration
 
-The software forming the basis of this development line was developed for the OSCARS project and is being further developed to support interoperability with ICOS.
+Luca Cerato coordinated and developed the software forming the basis of this development line and continues its technical development for the OSCARS project and interoperability with ICOS.
 
 The Git commit history remains the authoritative technical record of individual changes and their recorded authorship.
 
 ## External Software
 
-## Contributor Attribution
+### phenocam-vision-edge
 
-### Emanuele Tufarini
-
+**Developer:** Emanuele Tufarini  
 **Affiliation:** Terrasystem S.R.L.
 
 OSCARS-PHENOCAM integrates the separately maintained `phenocam-vision-edge` software:
