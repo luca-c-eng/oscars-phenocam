@@ -1,6 +1,6 @@
 # Clean Installation
 
-This guide describes a clean installation of OSCARS-PHENOCAM `dev/v1.8.0`.
+This guide describes a clean installation of OSCARS-PHENOCAM `dev/v0.1.0`.
 
 For all configuration fields, see [Configuration](CONFIGURATION.md).
 
@@ -39,14 +39,14 @@ A supported camera is required for acquisition, but the installer can finish whe
 Run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.8.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v0.1.0/install.sh | bash
 ```
 
 The installer:
 
 1. checks the execution user, operating system, architecture, route and required commands;
 2. installs `git`, `libimage-exiftool-perl` and `python3-venv` when required;
-3. clones `dev/v1.8.0` into `/opt/oscars-phenocam`;
+3. clones `dev/v0.1.0` into `/opt/oscars-phenocam`;
 4. installs only Phenocam Vision Edge v0.2.3, downloading and verifying its archive when the runtime is absent;
 5. installs and verifies the Vision Edge runtime in `/opt/phenocam-vision-edge-0.2.3`;
 6. creates the `phenocam` system user and deploys OSCARS-PHENOCAM to `/usr/local/lib/phenocam`;
