@@ -147,6 +147,7 @@ procedure.
 * [Troubleshooting](software/docs/TROUBLESHOOTING.md)
 * [Testing](software/docs/TESTING.md)
 * [Changelog](software/CHANGELOG.md)
+* [Project provenance](PROVENANCE.md)
 
 ---
 
