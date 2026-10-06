@@ -84,22 +84,30 @@ read_settings() {
   VISION_EDGE_ENABLED="${L[23]:-off}"      # on | off
   VISION_EDGE_MODE="${L[24]:-privacy}"     # metadata | annotated | privacy | delete
 
-  # v0.1.0 — configurable image resolution
+  # v0.1.0 — configurable image capture
   IMAGE_WIDTH="${L[25]:-2304}"
   IMAGE_HEIGHT="${L[26]:-1296}"
+  IMAGE_QUALITY="${L[27]:-100}"
 
   # Defensive defaults: never export an invalid capture timeout.
   [[ "$CAPTURE_TIMEOUT" =~ ^[0-9]+$ ]] || CAPTURE_TIMEOUT="30000"
   
-  # Camera Module 3 native resolution limits. - added in v0.1.0
+  # Camera Module 3 sensor-mode resolutions documented by Raspberry Pi.
   [[ "$IMAGE_WIDTH" =~ ^[1-9][0-9]{0,3}$ ]] || return 4
   [[ "$IMAGE_HEIGHT" =~ ^[1-9][0-9]{0,3}$ ]] || return 5
-  (( IMAGE_WIDTH <= 4608 )) || return 4
-  (( IMAGE_HEIGHT <= 2592 )) || return 5
+
+  case "${IMAGE_WIDTH}x${IMAGE_HEIGHT}" in
+    1536x864|2304x1296|4608x2592) ;;
+    *) return 6 ;;
+  esac
+
+  # rpicam-still JPEG quality range.
+  [[ "$IMAGE_QUALITY" =~ ^([1-9]|[1-9][0-9]|100)$ ]] || return 7
   
   # Preserve the variable names already consumed by capture and metadata scripts.
   WIDTH="$IMAGE_WIDTH"
   HEIGHT="$IMAGE_HEIGHT"
+  QUALITY="$IMAGE_QUALITY"
 
   # Apply fixed station time. DST is intentionally never used.
   configure_station_timezone || return 3
