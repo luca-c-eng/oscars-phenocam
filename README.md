@@ -1,7 +1,7 @@
 # OSCARS-PHENOCAM
 
 [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.8.0-blue.svg)](software/VERSION)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](software/VERSION)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18800314.svg)](https://doi.org/10.5281/zenodo.18800314)
 
 **Open and FAIR Integrated Phenology Monitoring System - PhenoCam Software**
@@ -125,7 +125,7 @@ On Raspberry Pi OS 64-bit based on Debian 13 `trixie`, run the installer as a
 regular user with `sudo` privileges:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v1.8.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/luca-c-eng/oscars-phenocam/refs/heads/dev/v0.1.0/install.sh | bash
 ```
 
 After installation, configure `/etc/phenocam/settings.txt`, configure FTP or
