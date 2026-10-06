@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata provided in this file."
+title: "OSCARS-PHENOCAM"
+type: software
+authors:
+  - family-names: "Cerato"
+    given-names: "Luca"
+    affiliation: "Terrasystem S.R.L."
+repository-code: "https://github.com/luca-c-eng/oscars-phenocam"
+license: "BSD-3-Clause"
+abstract: >-
+  Raspberry Pi-based phenological camera system developed for the OSCARS
+  project and designed for interoperability with the ICOS Carbon Portal.
+keywords:
+  - phenology
+  - phenocam
+  - Raspberry Pi
+  - OSCARS
+  - ICOS
