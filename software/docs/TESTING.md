@@ -112,6 +112,32 @@ Run:
 bash software/tests/test_vision_config.sh
 ```
 
+The suite verifies:
+
+- `off` and `privacy` defaults for existing 23-field settings files;
+- all supported `VISION_EDGE_ENABLED` and `VISION_EDGE_MODE` values;
+- rejection of unsupported enabled values;
+- rejection of unsupported and command-injection-shaped mode values;
+- separation between general configuration loading and detection validation.
+
+The test uses isolated temporary files. A successful run exits with status `0`
+and prints:
+
+```text
+vision configuration tests: OK
+```
+
+Any failed assertion produces a non-zero exit status.
+
+## Image Capture Configuration
+
+The image-capture configuration test suite covers the resolution and JPEG
+quality fields read by [`config_read.sh`](../scripts/config_read.sh).
+
+Run:
+
+```bash
+bash software/tests/test_capture_config.sh
 ```
 
 The suite verifies:
@@ -132,16 +158,6 @@ capture configuration tests: OK
 ```
 
 Any failed assertion produces a non-zero exit status.
-
-## Image Capture Configuration
-
-The image-capture configuration test suite covers the resolution and JPEG
-quality fields read by [`config_read.sh`](../scripts/config_read.sh).
-
-Run:
-
-```bash
-bash software/tests/test_capture_config.sh
 
 ---
 
