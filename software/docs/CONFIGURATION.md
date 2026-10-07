@@ -113,6 +113,9 @@ privacy
 
 The first six effective values are mandatory. Later values use internal defaults when they are absent.
 
+Existing 23-field configuration files remain valid. When positions 24 and 25
+are absent, the software uses `off` and `privacy` respectively.
+
 Existing 25-field configuration files receive the `2304x1296` resolution and
 quality `100` defaults. Existing 27-field files retain their configured
 resolution and receive the quality `100` default.
