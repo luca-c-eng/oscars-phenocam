@@ -73,6 +73,9 @@ imx708
 30000
 off
 privacy
+2304
+1296
+100
 ```
 
 ## Settings Reference
@@ -104,13 +107,48 @@ privacy
 |   23 | `CAPTURE_TIMEOUT`  | `30000`                     | Camera warm-up time in milliseconds                                   |
 |   24 | `VISION_EDGE_ENABLED` | `off`                    | Enables (`on`) or disables (`off`) detection                           |
 |   25 | `VISION_EDGE_MODE` | `privacy`                   | Selects `metadata`, `annotated`, `privacy` or `delete`                 |
+|   26 | `IMAGE_WIDTH`       | `2304`                      | Image width; must form a supported pair with `IMAGE_HEIGHT`            |
+|   27 | `IMAGE_HEIGHT`      | `1296`                      | Image height; must form a supported pair with `IMAGE_WIDTH`            |
+|   28 | `IMAGE_QUALITY`     | `100`                       | JPEG quality accepted by `rpicam-still`, from `1` to `100`             |
 
 The first six effective values are mandatory. Later values use internal defaults when they are absent.
 
-Existing 23-field configuration files remain valid. When positions 24 and 25
-are absent, the software uses `off` and `privacy` respectively.
+Existing 25-field configuration files receive the `2304x1296` resolution and
+quality `100` defaults. Existing 27-field files retain their configured
+resolution and receive the quality `100` default.
 
 A non-numeric `CAPTURE_TIMEOUT` is replaced with `30000`.
+
+---
+
+## Image Capture
+
+`IMAGE_WIDTH` and `IMAGE_HEIGHT` must form one of the supported Camera Module 3
+IMX708 sensor-mode pairs documented by Raspberry Pi:
+
+| `IMAGE_WIDTH` | `IMAGE_HEIGHT` | Behaviour |
+| -------------:| --------------:| --------- |
+| `1536`        | `864`          | Uses a central `3072x1728` sensor area and therefore changes the field of view |
+| `2304`        | `1296`         | Uses the full `4608x2592` sensor area; OSCARS default |
+| `4608`        | `2592`         | Uses the full sensor resolution and produces the largest images |
+
+The profiles are based on the
+[Raspberry Pi Camera Module 3 sensor modes](https://www.raspberrypi.com/documentation/computers/camera_software.html#list-cameras).
+
+Values from different profiles must not be combined. For example,
+`2304x2592` is invalid.
+
+`IMAGE_QUALITY` accepts an integer from `1` to `100`, following the
+[`rpicam-still` JPEG quality range](https://www.raspberrypi.com/documentation/computers/camera_software.html#quality).
+
+The initial OSCARS default is `100`. This value preserves the inherited capture
+behaviour but is not yet an operational recommendation. A recommended value
+will be established by comparing image quality, file size and Vision Edge
+results.
+
+The validated settings are exported internally as `WIDTH`, `HEIGHT` and
+`QUALITY` for capture and metadata generation. Unsupported dimension pairs or
+invalid quality values cause configuration loading to fail.
 
 ---
 
