@@ -129,6 +129,16 @@ vision configuration tests: OK
 
 Any failed assertion produces a non-zero exit status.
 
+## Image Capture Configuration
+
+The image-capture configuration test suite covers the resolution and JPEG
+quality fields read by [`config_read.sh`](../scripts/config_read.sh).
+
+Run:
+
+```bash
+bash software/tests/test_capture_config.sh
+
 ---
 
 [Back to the project README](../../README.md)
