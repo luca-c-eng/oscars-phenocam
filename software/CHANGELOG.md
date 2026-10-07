@@ -1,11 +1,35 @@
 # Changelog
 
-Changes between OSCARS-PHENOCAM versions `1.3.0` and `dev/v1.8.0`.
+Changes from OSCARS-PHENOCAM version `1.3.0` through the current
+`dev/v0.1.0` development line.
+
+## [dev/v0.1.0]
+
+### Added
+
+* `PROVENANCE.md` recording the preserved v1.8.0 derivation point, contributor attribution and external Vision Edge integration.
+* `CITATION.cff` containing software citation metadata.
+* `IMAGE_WIDTH`, `IMAGE_HEIGHT` and `IMAGE_QUALITY` as optional settings fields 26, 27 and 28.
+* Validation of the documented Camera Module 3 resolution profiles: `1536x864`, `2304x1296` and `4608x2592`.
+* JPEG quality validation for integer values from `1` to `100`.
+* Automated tests for capture defaults, supported profiles, quality boundaries and invalid values.
+* Configuration and testing documentation for the new image-capture settings.
+
+### Changed
+
+* The runtime version marker and development-branch references now identify `dev/v0.1.0`.
+* The default image resolution is `2304x1296`.
+* Direct capture and metadata-generation fallbacks use the same `2304x1296` default.
+* The initial JPEG quality default remains `100` pending comparative tests.
+* New configuration files contain 28 positional fields.
+* Existing 23-field, 25-field and 27-field configuration files remain supported through internal defaults.
+
+
+
+## [dev/v1.8.0]
 
 The v1.8.0 section is derived from the Git difference between
 `dev/v1.7.0` and `dev/v1.8.0`.
-
-## [dev/v1.8.0]
 
 ### Added
 
