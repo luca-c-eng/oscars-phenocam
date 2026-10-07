@@ -112,19 +112,23 @@ Run:
 bash software/tests/test_vision_config.sh
 ```
 
+```
+
 The suite verifies:
 
-- `off` and `privacy` defaults for existing 23-field settings files;
-- all supported `VISION_EDGE_ENABLED` and `VISION_EDGE_MODE` values;
-- rejection of unsupported enabled values;
-- rejection of unsupported and command-injection-shaped mode values;
-- separation between general configuration loading and detection validation.
+- the `2304x1296` and quality `100` defaults for existing 25-field settings;
+- the quality default for existing 27-field settings;
+- all supported Camera Module 3 resolution profiles;
+- JPEG quality boundary values;
+- propagation to the runtime `WIDTH`, `HEIGHT`, and `QUALITY` variables;
+- rejection of unsupported or mixed dimension pairs;
+- rejection of non-integer or out-of-range JPEG quality values.
 
-The test uses isolated temporary files. A successful run exits with status `0`
-and prints:
+The test uses isolated temporary files and does not access camera hardware or
+the network. A successful run exits with status `0` and prints:
 
 ```text
-vision configuration tests: OK
+capture configuration tests: OK
 ```
 
 Any failed assertion produces a non-zero exit status.
