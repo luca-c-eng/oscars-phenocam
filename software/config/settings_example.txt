@@ -1,5 +1,5 @@
 # OSCARS-PHENOCAM dev/v0.1.0 settings example
-# Required and exported, but not used by the capture timer.
+# Acquisition timing and ICOS upload configuration.
 #
 # Positional format: one effective value per field.
 # Blank lines and comment lines are ignored.
@@ -29,15 +29,17 @@ UTC+1
 22
 
 # 6 INTERVAL_MIN
-# Required and exported, but not used by the capture timer.
+# Default acquisition interval in minutes.
+# Supported values: 5, 10, 15, 20, 30 or 60.
 30
 
 # 7 IFACE
 # auto or an explicit interface name.
 auto
 
-# 8 SFTP_USER
-# Remote username used when SFTP is enabled.
+# 8 LEGACY_REMOTE_USER
+# Reserved positional field retained for compatibility; not used by this
+# ICOS-dedicated version.
 phenocam
 
 # 9 NET_MODE
@@ -61,8 +63,8 @@ auto
 90
 
 # 14 REMOTE_LAYOUT
-# general or icos.
-general
+# Use icos for the Carbon Portal workflow.
+icos
 
 # 15 SITE_LAT
 # Written as lat in metadata.
@@ -132,3 +134,32 @@ privacy
 # OSCARS initial default: 100.
 # The recommended operational value will be established through tests.
 100
+
+# 29 CP_ENVIRONMENT
+# Carbon Portal environment: staging or production.
+# Keep staging until the complete workflow has passed acceptance tests.
+staging
+
+# 30 CP_SUBMITTER_ID
+# Assigned by Carbon Portal technical staff. Upload remains disabled while nd.
+nd
+
+# 31 CP_STATION_URI
+# Canonical ICOS station URI assigned to this installation.
+nd
+
+# 32 CP_INSTRUMENT_URI
+# Canonical ICOS instrument URI assigned to this phenocamera.
+nd
+
+# 33 ICOS_FILENAME_SUFFIX
+# Configurable final component of the daily ICOS filename.
+# Use the station-specific value confirmed by ICOS, following the current
+# Lxx_Fxx convention (for example L09_F01). Upload remains disabled while nd.
+nd
+
+# 34 CAPTURE_MINUTE
+# Persistent offset within INTERVAL_MIN. For the default interval 30,
+# 13 requests captures at minutes 13 and 43 of every hour.
+# A new installation generates and stores one random value from 0 to 29.
+13
