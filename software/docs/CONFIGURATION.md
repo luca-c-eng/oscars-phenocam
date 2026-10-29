@@ -1,458 +1,143 @@
 # Configuration
 
-OSCARS-PHENOCAM reads its runtime configuration from:
+OSCARS-PHENOCAM uses two protected configuration files:
 
-```text
-/etc/phenocam/
-```
-
-The installer creates the configuration files only when they do not already exist.
-
----
-
-## Configuration Files
-
-| Path                    | Purpose                                                      |
-| ----------------------- | ------------------------------------------------------------ |
-| `settings.txt`          | Station, acquisition, storage, network and metadata settings |
-| `server.txt`            | SFTP destination hosts                                       |
-| `ftp_credentials.txt`   | FTP connection parameters                                    |
-| `known_hosts`           | Trusted SFTP server fingerprints                             |
-| `keys/phenocam_key`     | SFTP private key                                             |
-| `keys/phenocam_key.pub` | SFTP public key                                              |
-
-The installer applies these permissions:
-
-| Files                                                              | Owner               |  Mode |
-| ------------------------------------------------------------------ | ------------------- | ----: |
-| `settings.txt`, `server.txt`, `ftp_credentials.txt`, `known_hosts` | `root:phenocam`     | `640` |
-| `keys/phenocam_key`                                                | `phenocam:phenocam` | `600` |
-| `keys/phenocam_key.pub`                                            | `phenocam:phenocam` | `644` |
-
-Edit protected files using `sudo`.
-
----
+| Path | Contents | Owner and mode |
+| --- | --- | --- |
+| `/etc/phenocam/settings.txt` | Non-secret station, capture and ICOS values | `root:phenocam`, `640` |
+| `/etc/phenocam/cp_credentials.txt` | Station account email and password | `root:phenocam`, `640` |
 
 ## Main Settings
 
-Edit:
+`settings.txt` is positional: blank and comment lines are ignored, and each
+effective value must retain its position.
 
-```bash
-sudo nano /etc/phenocam/settings.txt
-```
+| Pos. | Variable | Initial value | Effective behaviour |
+| ---: | --- | --- | --- |
+| 1 | `SITENAME` | `mysite` | ICOS station code used in pair and ZIP filenames |
+| 2 | `UTC_OFFSET` | `+1` | Fixed station offset; daylight saving is not applied |
+| 3 | `TZ_LABEL` | `UTC+1` | Retained position; regenerated from `UTC_OFFSET` |
+| 4 | `START_HOUR` | `6` | Acquisition-window start, inclusive |
+| 5 | `END_HOUR` | `22` | Acquisition-window end, exclusive |
+| 6 | `INTERVAL_MIN` | `30` | 5, 10, 15, 20, 30 or 60 minutes |
+| 7 | `IFACE` | `auto` | Explicit interface or automatic route selection |
+| 8 | legacy remote user | `phenocam` | Reserved positional field; unused in the ICOS build |
+| 9 | `NET_MODE` | `auto` | `auto`, `ethernet` or `wifi` |
+| 10 | `RAM_MIN_FREE_MB` | `20` | RAM queue free-space threshold |
+| 11 | `SD_MAX_USED_PCT` | `80` | SD fallback usage threshold |
+| 12 | `USB_MOUNT_BASES` | `/media:/mnt` | Locations scanned for mounted USB storage |
+| 13 | `USB_MAX_USED_PCT` | `90` | USB usage threshold |
+| 14 | `REMOTE_LAYOUT` | `icos` | Must remain `icos` in this dedicated build |
+| 15–20 | site metadata | `nd` | Existing sidecar metadata fields |
+| 21 | `BOARD` | detected value | Board identifier |
+| 22 | `CAMERA_MODEL` | `imx708` | Camera identifier |
+| 23 | `CAPTURE_TIMEOUT` | `30000` | Camera warm-up time in milliseconds |
+| 24 | `VISION_EDGE_ENABLED` | `off` | `on` or `off` |
+| 25 | `VISION_EDGE_MODE` | `privacy` | `metadata`, `annotated`, `privacy` or `delete` |
+| 26 | `IMAGE_WIDTH` | `2304` | Image width |
+| 27 | `IMAGE_HEIGHT` | `1296` | Image height |
+| 28 | `IMAGE_QUALITY` | `100` | JPEG quality from 1 to 100 |
+| 29 | `CP_ENVIRONMENT` | `staging` | `staging` or `production` |
+| 30 | `CP_SUBMITTER_ID` | `nd` | Identifier assigned by Carbon Portal staff |
+| 31 | `CP_STATION_URI` | `nd` | Canonical ICOS station URI |
+| 32 | `CP_INSTRUMENT_URI` | `nd` | Canonical ICOS instrument URI |
+| 33 | `ICOS_FILENAME_SUFFIX` | `nd` | Station-specific ICOS-approved suffix |
+| 34 | `CAPTURE_MINUTE` | generated once | Stable offset within `INTERVAL_MIN` |
 
-The file uses a positional format with one effective value per line.
+The complete commented template is
+[`software/config/settings_example.txt`](../config/settings_example.txt).
 
-Blank lines and comment lines are removed before positions are assigned. A blank line therefore cannot represent an empty field, and the order of the values must not change.
+## Capture Settings
 
-The installer creates:
+The supported Camera Module 3 image-size pairs are:
 
-```text
-mysite
-+1
-UTC+1
-6
-22
-30
-auto
-phenocam
-auto
-20
-80
-/media:/mnt
-90
-general
-nd
-nd
-nd
-nd
-nd
-nd
-unknown
-imx708
-30000
-off
-privacy
-2304
-1296
-100
-```
+| Width | Height | Sensor use |
+| ---: | ---: | --- |
+| 1536 | 864 | Central 3072 × 1728 area |
+| 2304 | 1296 | Full 4608 × 2592 sensor area; project default |
+| 4608 | 2592 | Full sensor resolution |
 
-## Settings Reference
+Width and height cannot be mixed between rows. JPEG quality accepts integers
+from 1 through 100 and defaults to 100.
 
-| Pos. | Variable           | Initial value               | Effective behaviour                                                   |
-| ---: | ------------------ | --------------------------- | --------------------------------------------------------------------- |
-|    1 | `SITENAME`         | `mysite`                    | Used in filenames, metadata and remote paths                          |
-|    2 | `UTC_OFFSET`       | `+1`                        | Defines the fixed station time offset                                 |
-|    3 | `TZ_LABEL`         | `UTC+1`                     | Required by the positional parser, then regenerated from `UTC_OFFSET` |
-|    4 | `START_HOUR`       | `6`                         | Start of the acquisition window, inclusive                            |
-|    5 | `END_HOUR`         | `22`                        | End of the acquisition window, exclusive                              |
-|    6 | `INTERVAL_MIN`     | `30`                        | Read and exported, but not used by the capture timer                  |
-|    7 | `IFACE`            | `auto`                      | Explicit network interface or automatic selection                     |
-|    8 | `SFTP_USER`        | `phenocam`                  | Remote username used for SFTP                                         |
-|    9 | `NET_MODE`         | `auto`                      | Selects the `auto`, `ethernet` or `wifi` interface-resolution branch  |
-|   10 | `RAM_MIN_FREE_MB`  | `20`                        | RAM queue is used when its free space is at or above this value       |
-|   11 | `SD_MAX_USED_PCT`  | `80`                        | Applied only when SD fallback is required                             |
-|   12 | `USB_MOUNT_BASES`  | `/media:/mnt`               | Colon-separated locations scanned for writable mounted filesystems    |
-|   13 | `USB_MAX_USED_PCT` | `90`                        | USB is used only when its usage is below this value                   |
-|   14 | `REMOTE_LAYOUT`    | `general`                   | Remote directory layout: `general` or `icos`                          |
-|   15 | `SITE_LAT`         | `nd`                        | Written as `lat` in metadata                                          |
-|   16 | `SITE_LON`         | `nd`                        | Written as `lon` in metadata                                          |
-|   17 | `SITE_ELEV_M`      | `nd`                        | Written as `elev` in metadata                                         |
-|   18 | `SITE_START_DATE`  | `nd`                        | Written as `start_date` in metadata                                   |
-|   19 | `SITE_END_DATE`    | `nd`                        | Written as `end_date` in metadata                                     |
-|   20 | `SITE_NIMAGE`      | `nd`                        | Written as `nimage` in metadata                                       |
-|   21 | `BOARD`            | detected value or `unknown` | Read and exported, but not consumed by the runtime scripts            |
-|   22 | `CAMERA_MODEL`     | `imx708`                    | Read and exported, but not consumed by the runtime scripts            |
-|   23 | `CAPTURE_TIMEOUT`  | `30000`                     | Camera warm-up time in milliseconds                                   |
-|   24 | `VISION_EDGE_ENABLED` | `off`                    | Enables (`on`) or disables (`off`) detection                           |
-|   25 | `VISION_EDGE_MODE` | `privacy`                   | Selects `metadata`, `annotated`, `privacy` or `delete`                 |
-|   26 | `IMAGE_WIDTH`       | `2304`                      | Image width; must form a supported pair with `IMAGE_HEIGHT`            |
-|   27 | `IMAGE_HEIGHT`      | `1296`                      | Image height; must form a supported pair with `IMAGE_WIDTH`            |
-|   28 | `IMAGE_QUALITY`     | `100`                       | JPEG quality accepted by `rpicam-still`, from `1` to `100`             |
-
-The first six effective values are mandatory. Later values use internal defaults when they are absent.
-
-Existing 23-field configuration files remain valid. When positions 24 and 25
-are absent, the software uses `off` and `privacy` respectively.
-
-Existing 25-field configuration files receive the `2304x1296` resolution and
-quality `100` defaults. Existing 27-field files retain their configured
-resolution and receive the quality `100` default.
-
-A non-numeric `CAPTURE_TIMEOUT` is replaced with `30000`.
-
----
-
-## Image Capture
-
-`IMAGE_WIDTH` and `IMAGE_HEIGHT` must form one of the supported Camera Module 3
-IMX708 sensor-mode pairs documented by Raspberry Pi:
-
-| `IMAGE_WIDTH` | `IMAGE_HEIGHT` | Behaviour |
-| -------------:| --------------:| --------- |
-| `1536`        | `864`          | Uses a central `3072x1728` sensor area and therefore changes the field of view |
-| `2304`        | `1296`         | Uses the full `4608x2592` sensor area; OSCARS default |
-| `4608`        | `2592`         | Uses the full sensor resolution and produces the largest images |
-
-The profiles are based on the
-[Raspberry Pi Camera Module 3 sensor modes](https://www.raspberrypi.com/documentation/computers/camera_software.html#list-cameras).
-
-Values from different profiles must not be combined. For example,
-`2304x2592` is invalid.
-
-`IMAGE_QUALITY` accepts an integer from `1` to `100`, following the
-[`rpicam-still` JPEG quality range](https://www.raspberrypi.com/documentation/computers/camera_software.html#quality).
-
-The initial OSCARS default is `100`. This value preserves the inherited capture
-behaviour but is not yet an operational recommendation. A recommended value
-will be established by comparing image quality, file size and Vision Edge
-results.
-
-The validated settings are exported internally as `WIDTH`, `HEIGHT` and
-`QUALITY` for capture and metadata generation. Unsupported dimension pairs or
-invalid quality values cause configuration loading to fail.
-
----
-
-## Station Time
-
-`UTC_OFFSET` accepts:
-
-* `0`, `+0` or `-0`;
-* a signed hour from `-14` to `+14`;
-* an optional minute component between `00` and `59`, such as `+5:30`.
-
-The software exports a fixed POSIX timezone from this value. Daylight-saving-time changes are not applied.
-
-`TZ_LABEL` is regenerated from `UTC_OFFSET`. Changing position 3 independently has no runtime effect, but the value must remain present because it is one of the six mandatory fields.
-
-The acquisition window is evaluated as:
+The acquisition window is evaluated in fixed station time as:
 
 ```text
 START_HOUR <= current station hour < END_HOUR
 ```
 
-For example:
+## Persistent Acquisition Offset
 
-```text
-START_HOUR = 6
-END_HOUR   = 22
-```
+The installer generates `CAPTURE_MINUTE` once and writes it to `settings.txt`.
+For example, an interval of `30` and an offset of `13` request captures at
+`:13` and `:43` of every hour. The value remains unchanged across reboots.
 
-allows acquisition from hour `06` through hour `21`.
-
-The current comparison does not support a window that crosses midnight.
-
----
-
-## Capture Schedule
-
-`INTERVAL_MIN` is read from position 6 but is not used to schedule captures.
-
-The effective schedule is defined in `phenocam-capture.timer`:
-
-```ini
-OnCalendar=*-*-* *:00,30:00 UTC
-```
-
-The capture service is therefore requested at minutes `00` and `30` of every hour in UTC.
-
-To change the schedule, create a `systemd` override:
+After explicitly changing `INTERVAL_MIN` or `CAPTURE_MINUTE`, apply the new
+schedule with:
 
 ```bash
-sudo systemctl edit phenocam-capture.timer
+sudo /usr/local/lib/phenocam/bin/phenocam-configure-schedule.sh
 ```
 
-For example, to request a capture every 15 minutes:
+The selected minute must be smaller than the interval.
 
-```ini
-[Timer]
-OnCalendar=
-OnCalendar=*-*-* *:00,15,30,45:00 UTC
-```
+## ICOS Identity
 
-Apply the override:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl restart phenocam-capture.timer
-```
-
-Position 6 must remain in `settings.txt` even when the timer is overridden.
-
----
-
-## Vision Edge Detection
-
-Phenocam Vision Edge v0.2.3 is installed by `install.sh`. Detection is executed
-from the upload cycle, inside the existing upload lock and before the Internet
-availability check.
-
-`VISION_EDGE_ENABLED` accepts only:
-
-| Value | Behaviour |
-| ----- | --------- |
-| `off` | Does not run inference. The queued pair is marked as detection-disabled and becomes eligible for upload. |
-| `on`  | Runs Vision Edge on each queued pair that has not already completed detection. |
-
-`VISION_EDGE_MODE` accepts only:
-
-| Value       | Vision Edge action |
-| ----------- | ------------------ |
-| `metadata`  | Updates detection metadata without modifying the JPEG. |
-| `annotated` | Replaces the queued JPEG with the annotated image when an enabled detection exists. |
-| `privacy`   | Replaces the queued JPEG with the privacy-blurred image when an enabled detection exists. |
-| `delete`    | Deletes the queued JPEG and metadata only when an enabled detection exists. |
-
-When detection is `off`, the selected mode is still recorded in the metadata as
-`filter_mode`; no inference action is performed.
-
-When `annotated`, `privacy` or `delete` produces no enabled detection, the
-original JPEG remains queued and the metadata records a completed negative
-result.
-
-The mode is selected internally from this fixed list. Configuration values are
-never evaluated as shell commands or forwarded as arbitrary command-line
-arguments.
-
-Detection state is stored in the pair's `.meta` file. Later cycles skip pairs
-already marked `off` or `ready`. Therefore, changing positions 24 or 25 affects
-only pairs that have not yet completed detection.
-
-Pairs already present during an upgrade from v1.7.0 have no detection state and
-are processed using the effective v1.8.0 configuration. With an unchanged
-23-field file, the backward-compatible default is `off`.
-
-An unsupported value in either position stops the upload cycle before queue
-processing. Capture remains active because detection validation is deliberately
-separate from general settings loading.
-
----
-
-## Network Selection
-
-Network resolution first examines `IFACE`.
-
-* If `IFACE` contains an existing interface name other than `auto`, that interface is returned.
-* If the requested interface does not exist, selection continues according to `NET_MODE`.
-
-`NET_MODE` selects one of three branches:
-
-| Value           | Behaviour                                                                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ethernet`      | Returns the first interface with a global IPv4 address whose name begins with `eth` or `en`                                                |
-| `wifi`          | Returns the first interface with a global IPv4 address whose name begins with `wlan` or `wl`                                               |
-| `auto`          | Uses the interface selected by the route to `1.1.1.1`; if unavailable, returns the first non-loopback interface with a global IPv4 address |
-| any other value | Follows the same branch as `auto`                                                                                                          |
-
-The `ethernet` and `wifi` branches do not continue to default-route selection when no matching interface is found.
-
-Use:
+Keep `CP_ENVIRONMENT=staging` until end-to-end acceptance tests have succeeded.
+Before upload can begin, replace the three `nd` values with values supplied or
+confirmed by ICOS:
 
 ```text
-auto
+CP_SUBMITTER_ID
+CP_STATION_URI
+CP_INSTRUMENT_URI
 ```
 
-for both `IFACE` and `NET_MODE` when no interface restriction is required.
-
----
-
-## Storage Selection
-
-A completed JPEG and metadata pair is assigned using this sequence:
-
-1. Use the RAM queue when its free space is at or above `RAM_MIN_FREE_MB`.
-2. Otherwise, locate the first mounted and writable filesystem below `USB_MOUNT_BASES`.
-3. Use its USB queue when usage is below `USB_MAX_USED_PCT`.
-4. Otherwise, attempt to use the SD queue.
-5. If SD usage is at or above `SD_MAX_USED_PCT`, remove the captured pair from staging and complete the cycle without queuing it.
-
-`SD_MAX_USED_PCT` is not checked while the RAM queue or a suitable USB queue can be used.
-
----
-
-## FTP Configuration
-
-Edit:
-
-```bash
-sudo nano /etc/phenocam/ftp_credentials.txt
-```
-
-Add at least five effective values in this order:
+`CP_SUBMITTER_ID` is not the login email. The filename suffix controls only the
+final component of:
 
 ```text
-FTP_HOST
-FTP_PORT
-FTP_REMOTE_BASE
-FTP_USER
-FTP_PASS
+SITENAME_PHEN_YYYYMMDD_ICOS_FILENAME_SUFFIX.zip
 ```
 
-Blank and comment lines are excluded when the file is read.
+The placeholder is `nd`, which disables submission without blocking capture.
+Set the station-specific `Lxx_Fxx` value confirmed by ICOS. Current ICOS
+examples follow this structure; the field remains configurable so a confirmed
+future convention does not require changes to the packaging workflow.
 
-`FTP_PORT` must contain only digits. The uploader always constructs an `ftp://` URL; using port `22` does not enable SFTP.
+## Staging Account
 
-FTP credentials are stored as plain text and must not be committed to the repository.
-
----
-
-## SFTP Configuration
-
-### 1. Authorize the Public Key
-
-Display the generated public key:
+Edit the separate credentials file:
 
 ```bash
-sudo cat /etc/phenocam/keys/phenocam_key.pub
+sudo nano /etc/phenocam/cp_credentials.txt
 ```
 
-Authorize it on every destination server.
-
-Do not share the private key:
+Its exact format is:
 
 ```text
-/etc/phenocam/keys/phenocam_key
+account-email@example.org
+account-password
 ```
 
-### 2. Configure Destination Hosts
+The account belongs to this station installation. Credentials are read only at
+upload time and are never copied into image metadata, command-line arguments or
+logs.
 
-Edit:
+## Activation Rules
 
-```bash
-sudo nano /etc/phenocam/server.txt
-```
+The system continues capturing while ICOS configuration is incomplete.
+Submission starts only when the following values are valid:
 
-Add one hostname or IP address per line.
+- `REMOTE_LAYOUT=icos`;
+- `CP_ENVIRONMENT` is `staging` or `production`;
+- `SITENAME` follows the ICOS station-code form;
+- `CP_SUBMITTER_ID` is not `nd`;
+- station and instrument URIs use their canonical ICOS forms;
+- the filename suffix is valid;
+- the credentials file contains both lines.
 
-Use no leading or trailing whitespace. Comment lines must begin directly with `#`.
+Missing identity retains source pairs. Missing credentials retains prepared
+daily products in the outbox.
 
-### 3. Configure the Username
-
-Set `SFTP_USER` in position 8 of:
-
-```text
-/etc/phenocam/settings.txt
-```
-
-### 4. Register Server Fingerprints
-
-For each destination, run:
-
-```bash
-sudo ssh-keyscan -H <hostname> |
-  sudo tee -a /etc/phenocam/known_hosts >/dev/null
-```
-
-SFTP uses:
-
-```text
-BatchMode=yes
-StrictHostKeyChecking=yes
-```
-
-An unknown server key or an unavailable private key causes the SFTP upload to fail.
-
----
-
-## Upload Activation
-
-SFTP is enabled when `server.txt` contains at least one non-empty, non-comment line.
-
-FTP is enabled when `ftp_credentials.txt` contains at least five effective lines and positions 1, 2, 4 and 5 do not contain these example placeholders:
-
-```text
-YOUR_FTP_HOST_OR_IP
-YOUR_FTP_PORT
-your_ftp_username
-your_ftp_password
-```
-
-The remote-base value in position 3 is not checked against an example placeholder during activation.
-
-| `server.txt`                | FTP configuration | Attempted upload |
-| --------------------------- | ----------------- | ---------------- |
-| No effective host           | Disabled          | None             |
-| At least one effective host | Disabled          | SFTP             |
-| No effective host           | Enabled           | FTP              |
-| At least one effective host | Enabled           | SFTP, then FTP   |
-
-Activation does not guarantee that credentials, hosts or remote services are valid.
-
-When both protocols are enabled, both are attempted for each pair. Local files are removed only when every enabled upload succeeds.
-
-If one enabled target succeeds and another fails, the pair remains queued and is offered to all enabled targets again during the next upload cycle.
-
----
-
-## Remote Directory Layout
-
-`REMOTE_LAYOUT` accepts `general` or `icos`.
-
-| Layout    | SFTP path           | FTP path                            |
-| --------- | ------------------- | ----------------------------------- |
-| `general` | `SITENAME/YYYY/MM/` | `FTP_REMOTE_BASE/SITENAME/YYYY/MM/` |
-| `icos`    | `data/SITENAME/`    | `FTP_REMOTE_BASE/data/SITENAME/`    |
-
-Any other value causes the upload attempt to fail.
-
----
-
-## Apply and Verify
-
-Configuration files are read at the beginning of each capture or upload cycle. Changes are therefore used by the next applicable execution.
-
-Check upload prerequisites with:
-
-```bash
-sudo /usr/local/lib/phenocam/bin/diag_upload.sh
-```
-
-This diagnostic checks the presence or file size of selected upload files. It does not validate their complete effective configuration and does not perform a transfer.
-
-For service management and runtime checks, see [Operations](OPERATIONS.md).
-
----
-
-[Clean installation](CLEAN_INSTALL.md) | [Back to the project README](../../README.md)
+[Architecture](ARCHITECTURE.md) | [Operations](OPERATIONS.md) | [Project README](../../README.md)
