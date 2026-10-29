@@ -1,164 +1,65 @@
 # Testing
 
-Run all commands in this document from the repository root.
+Run these commands from the repository root. The automated suites use
+temporary files and local HTTP services; they do not contact ICOS, require root
+privileges or execute ONNX inference.
 
-## Requirements
-
-- Python 3.13, as required by the target Raspberry Pi runtime.
-- Bash and standard system utilities.
-- No third-party Python packages.
-- No root privileges.
-
-The tests use temporary files. They do not run ONNX inference, require the
-Vision Edge model, or modify repository files.
-
-## Detection Metadata
-
-The detection metadata test suite covers
-[`detection_metadata.py`](../scripts/detection_metadata.py).
-
-Run:
-
-```bash
-python3 -m unittest -v software/tests/test_detection_metadata.py
-```
-
-The suite verifies:
-
-- transitions between the `pending`, `vision`, `off`, and `ready` states;
-- atomic writes and preservation of file permissions;
-- LF and CRLF line endings;
-- software and model identity fields;
-- detection classes, per-class counts, and `total_count` consistency;
-- output fields for `metadata`, `annotated`, `privacy`, and `delete` modes;
-- rejection of duplicate fields, symbolic links, and inconsistent metadata.
-
-A successful run exits with status `0` and ends with:
-
-```text
-Ran 17 tests in ...
-
-OK
-```
-
-Any failed test produces a non-zero exit status.
-
-## Detection Queue Manager
-
-The queue-manager test suite covers
-[`detection_manager.sh`](../scripts/detection_manager.sh) together with the
-detection metadata helper.
-
-Run:
-
-```bash
-bash software/tests/test_detection_manager.sh
-```
-
-The suite verifies:
-
-- disabled detection without an inference call;
-- completion of an existing Vision Edge metadata section;
-- one-time processing of a newly queued pair;
-- rejection of pending pairs by the upload readiness gate;
-- successful privacy-mode metadata handling;
-- recovery from partial deletion in `delete` mode;
-- retention and upload rejection of invalid metadata.
-
-The test substitutes deterministic detection results and does not execute ONNX
-inference. A successful run exits with status `0` and prints:
-
-```text
-detection_manager tests: OK
-```
-
-Any failed assertion produces a non-zero exit status.
-
-## Upload Readiness Gate
-
-The upload-gate test suite covers the readiness check in
-[`uploader_daemon.sh`](../scripts/uploader_daemon.sh).
-
-Run:
-
-```bash
-bash software/tests/test_upload_gate.sh
-```
-
-The suite verifies:
-
-- retention of pairs that have not completed detection;
-- suppression of network, SFTP, and FTP calls for those pairs;
-- normal upload and removal of ready pairs;
-- retention of both files when an enabled upload target fails.
-
-The test uses isolated temporary files and does not require network access. A
-successful run exits with status `0` and prints:
-
-```text
-upload gate tests: OK
-```
-
-Any failed assertion produces a non-zero exit status.
-
-## Vision Edge Configuration
-
-The configuration test suite covers the Vision Edge fields read by
-[`config_read.sh`](../scripts/config_read.sh).
-
-Run:
-
-```bash
-bash software/tests/test_vision_config.sh
-```
-
-The suite verifies:
-
-- `off` and `privacy` defaults for existing 23-field settings files;
-- all supported `VISION_EDGE_ENABLED` and `VISION_EDGE_MODE` values;
-- rejection of unsupported enabled values;
-- rejection of unsupported and command-injection-shaped mode values;
-- separation between general configuration loading and detection validation.
-
-The test uses isolated temporary files. A successful run exits with status `0`
-and prints:
-
-```text
-vision configuration tests: OK
-```
-
-Any failed assertion produces a non-zero exit status.
-
-## Image Capture Configuration
-
-The image-capture configuration test suite covers the resolution and JPEG
-quality fields read by [`config_read.sh`](../scripts/config_read.sh).
-
-Run:
+## Core Test Suite
 
 ```bash
 bash software/tests/test_capture_config.sh
+bash software/tests/test_vision_config.sh
+python3 -m unittest -v software/tests/test_detection_metadata.py
+bash software/tests/test_detection_manager.sh
+bash software/tests/test_icos_config.sh
+bash software/tests/test_schedule_manager.sh
+bash software/tests/test_queue_manager.sh
+bash software/tests/test_icos_manager.sh
+python3 -m unittest -v software/tests/test_icos_client.py
+bash software/tests/test_system_integration.sh
 ```
 
-The suite verifies:
+The ICOS-specific suites verify:
 
-- the `2304x1296` and quality `100` defaults for existing 25-field settings;
-- the quality default for existing 27-field settings;
-- all supported Camera Module 3 resolution profiles;
-- JPEG quality boundary values;
-- propagation to the runtime `WIDTH`, `HEIGHT`, and `QUALITY` variables;
-- rejection of unsupported or mixed dimension pairs;
-- rejection of non-integer or out-of-range JPEG quality values.
+- staging/production selection and rejection of invalid values;
+- filename-suffix and persistent-minute validation;
+- 30- and 15-minute systemd schedules;
+- verified JPEG/META queue publication, collision protection and temporary-file cleanup;
+- daily pair discovery and root-level, JPEG-only uncompressed ZIP creation;
+- full station-day UTC acquisition interval generation;
+- SHA-256 JSON metadata generation;
+- CPauth cookie acquisition;
+- authenticated metadata POST and chunked archive PUT;
+- rejection of successful logins without a `cpauthToken`;
+- retry of the data PUT without repeating a completed metadata POST;
+- distinct retryable and blocked error classes;
+- local receipt creation and verified source cleanup;
+- ICOS runtime completeness, safe base timers and service timeout contracts.
 
-The test uses isolated temporary files and does not access camera hardware or
-the network. A successful run exits with status `0` and prints:
+## Static Checks
 
-```text
-capture configuration tests: OK
+```bash
+python3 -m py_compile \
+  software/scripts/icos_client.py \
+  software/scripts/detection_metadata.py
+
+bash -n install.sh software/bin/*.sh software/scripts/*.sh software/tests/*.sh
+git diff --check
 ```
 
-Any failed assertion produces a non-zero exit status.
+## Real Staging Acceptance Test
 
----
+Automated tests cannot replace one authenticated staging submission. The final
+acceptance test requires:
 
-[Back to the project README](../../README.md)
+- an authorized staging account;
+- the assigned `submitterId`;
+- the canonical station URI;
+- the canonical instrument URI;
+- a confirmed filename suffix.
+
+Run the installed upload service after configuring these values. A successful
+test must create a receipt in `/var/lib/phenocam/icos-receipts` and the object
+must be confirmed in the Carbon Portal staging environment.
+
+[Architecture](ARCHITECTURE.md) | [Configuration](CONFIGURATION.md) | [Project README](../../README.md)

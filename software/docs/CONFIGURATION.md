@@ -33,7 +33,7 @@ effective value must retain its position.
 | 22 | `CAMERA_MODEL` | `imx708` | Camera identifier |
 | 23 | `CAPTURE_TIMEOUT` | `30000` | Camera warm-up time in milliseconds |
 | 24 | `VISION_EDGE_ENABLED` | `off` | `on` or `off` |
-| 25 | `VISION_EDGE_MODE` | `privacy` | `metadata`, `annotated`, `privacy` or `delete` |
+| 25 | `VISION_EDGE_MODE` | `metadata` | `metadata`, `annotated` or `delete` |
 | 26 | `IMAGE_WIDTH` | `2304` | Image width |
 | 27 | `IMAGE_HEIGHT` | `1296` | Image height |
 | 28 | `IMAGE_QUALITY` | `100` | JPEG quality from 1 to 100 |
@@ -119,6 +119,9 @@ Its exact format is:
 account-email@example.org
 account-password
 ```
+
+The file must contain exactly these two non-empty lines. A final newline after
+the password is optional.
 
 The account belongs to this station installation. Credentials are read only at
 upload time and are never copied into image metadata, command-line arguments or

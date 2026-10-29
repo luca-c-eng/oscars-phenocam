@@ -7,6 +7,14 @@ Changes from OSCARS-PHENOCAM version `1.3.0` through the current
 
 ### Added
 
+* Direct ICOS Carbon Portal staging and production support using the standard authenticated two-step workflow.
+* Daily, root-level, uncompressed Level-0 ZIP creation for the `etcPhenocamDaily` object specification.
+* SHA-256 metadata packages containing the station, instrument and station-day acquisition interval.
+* Immutable retry outbox, environment binding, upload receipts and manifest-verified source cleanup.
+* `CP_ENVIRONMENT`, `CP_SUBMITTER_ID`, `CP_STATION_URI`, `CP_INSTRUMENT_URI`, `ICOS_FILENAME_SUFFIX` and `CAPTURE_MINUTE` as settings fields 29–34.
+* A separate protected Carbon Portal credentials file.
+* Persistent randomized capture/upload scheduling and a schedule-configuration helper.
+* Automated tests for ICOS configuration, scheduling, daily packaging and the HTTP client.
 * `PROVENANCE.md` recording the preserved v1.8.0 derivation point, contributor attribution and external Vision Edge integration.
 * `CITATION.cff` containing software citation metadata.
 * `IMAGE_WIDTH`, `IMAGE_HEIGHT` and `IMAGE_QUALITY` as optional settings fields 26, 27 and 28.
@@ -21,8 +29,33 @@ Changes from OSCARS-PHENOCAM version `1.3.0` through the current
 * The default image resolution is `2304x1296`.
 * Direct capture and metadata-generation fallbacks use the same `2304x1296` default.
 * The initial JPEG quality default remains `100` pending comparative tests.
-* New configuration files contain 28 positional fields.
-* Existing 23-field, 25-field and 27-field configuration files remain supported through internal defaults.
+* New configuration files contain 34 positional fields and default to the ICOS staging environment.
+* Existing 23-field, 25-field, 27-field and 28-field configurations are migrated to the 34-field ICOS layout with an interval-compatible persistent capture offset.
+* The operational upload entry point is dedicated to ICOS and no longer selects FTP or SFTP destinations.
+* `metadata` is the default Vision Edge mode and does not modify the JPEG.
+* The optional image-blurring output provided by Vision Edge is not exposed by
+  the ICOS workflow and is not included in final sidecars.
+* Missed timer events are not replayed after downtime, and the startup
+  capture/upload diagnostic is no longer scheduled automatically.
+* JPEG/META queue publication now verifies cross-filesystem copies, preserves
+  complete staging pairs for retry and prevents overwriting conflicting files.
+* Daily packaging no longer applies an undocumented local ZIP-size limit;
+  Carbon Portal validation remains authoritative.
+* Uploaded source cleanup must remove and verify every manifest entry before
+  the receipt and immutable outbox product are finalized locally.
+* `etcPhenocamDaily` ZIP files contain JPEG images only; local META sidecars
+  remain covered by the cleanup manifest without entering the data object.
+* Carbon Portal credentials require exactly two non-empty lines, with or
+  without a final newline.
+* Upload now rejects missing CPauth tokens and unsafe registration markers
+  before the data PUT, while retaining the completed registration across
+  retryable PUT failures.
+* The base upload timer now matches the default capture schedule, and systemd
+  service timeouts cover the complete sequential ICOS request limits.
+* Installer verification excludes Git internals, checks the complete ICOS
+  runtime set and re-executes safe RAM-disk initialization during upgrades.
+* USB handlers honour configured mount bases and no longer remove queue
+  temporary files outside the capture lock.
 
 
 
@@ -36,7 +69,7 @@ The v1.8.0 section is derived from the Git difference between
 * Optional integration with Phenocam Vision Edge v0.2.3.
 * Installation of the Vision Edge runtime in `/opt/phenocam-vision-edge-0.2.3`.
 * `VISION_EDGE_ENABLED` as settings field 24, accepting only `on` or `off` and defaulting to `off`.
-* `VISION_EDGE_MODE` as settings field 25, accepting only `metadata`, `annotated`, `privacy` or `delete` and defaulting to `privacy`.
+* `VISION_EDGE_MODE` as settings field 25, accepting the metadata-only, annotation, detected-region blurring or deletion actions.
 * `detection_manager.sh` for processing queued pairs before upload.
 * `detection_metadata.py` for validating and atomically maintaining detection state in the existing `.meta` file.
 * Detection states `pending`, `vision`, `off` and `ready`, without a separate marker file.
@@ -52,12 +85,12 @@ The v1.8.0 section is derived from the Git difference between
 * Detection runs in USB, SD and RAM order before upload-method and Internet-route checks.
 * Completed `off` and `ready` pairs are skipped by later detection cycles; pending pairs can be retried.
 * `metadata` mode retains the original JPEG and records the detection result.
-* Positive `annotated` and `privacy` results atomically replace the queued JPEG using the same filename; negative results retain the original JPEG.
+* Positive annotation and detected-region blurring results atomically replace the queued JPEG using the same filename; negative results retain the original JPEG.
 * Positive `delete` results remove the queued JPEG and metadata pair; negative results retain the pair.
 * The uploader postpones pairs whose detection metadata is missing, incomplete or invalid.
-* Existing 23-field settings files remain valid and receive the `off` and `privacy` defaults internally.
+* Existing 23-field settings files remain valid and receive safe internal defaults.
 * Detection-setting validation is separate from general settings loading, so invalid detection-only values do not stop capture from queuing new pairs.
-* New configuration files created by the installer contain `off` and `privacy` as fields 24 and 25; existing configuration files are not overwritten.
+* New configuration files created by the installer contain explicit detection settings as fields 24 and 25; existing configuration files are not overwritten.
 * The runtime version marker is `dev/v1.8.0`.
 * The installer deploys Python runtime scripts in addition to shell scripts.
 * Project documentation now describes the v1.8.0 installation, configuration, architecture, metadata, operations, tests and failure handling.
