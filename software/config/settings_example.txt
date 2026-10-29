@@ -110,8 +110,11 @@ off
 
 # 25 VISION_EDGE_MODE
 # Selects the action performed when detection is enabled.
-# Accepted values: metadata, annotated, privacy, delete. Default: privacy.
-privacy
+#   metadata                - record detections without changing the JPEG
+#   annotated               - draw detected objects on the JPEG
+#   delete                  - discard the image when an object is detected
+# Default: metadata.
+metadata
 
 
 # 26 IMAGE_WIDTH

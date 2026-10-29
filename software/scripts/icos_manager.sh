@@ -10,7 +10,6 @@ ICOS_RECEIPT_DIR="${ICOS_RECEIPT_DIR:-/var/lib/phenocam/icos-receipts}"
 ICOS_CREDENTIALS_FILE="${ICOS_CREDENTIALS_FILE:-/etc/phenocam/cp_credentials.txt}"
 ICOS_CLIENT="${ICOS_CLIENT:-/usr/local/lib/phenocam/scripts/icos_client.py}"
 ICOS_PYTHON="${ICOS_PYTHON:-/usr/bin/python3}"
-ICOS_MAX_ZIP_BYTES="${ICOS_MAX_ZIP_BYTES:-288358400}" # 275 MiB
 
 _icos_pair_day() {
   local path="$1" base stem
@@ -35,10 +34,13 @@ _icos_set_queue_dirs() {
 }
 
 _icos_credentials_configured() {
+  local -a credentials=()
   [[ -f "$ICOS_CREDENTIALS_FILE" && ! -L "$ICOS_CREDENTIALS_FILE" ]] || return 1
-  [[ "$(wc -l < "$ICOS_CREDENTIALS_FILE")" -ge 2 ]] || return 1
-  [[ -n "$(sed -n '1p' "$ICOS_CREDENTIALS_FILE")" ]] || return 1
-  [[ -n "$(sed -n '2p' "$ICOS_CREDENTIALS_FILE")" ]]
+  mapfile -t credentials < "$ICOS_CREDENTIALS_FILE" || return 1
+  [[ "${#credentials[@]}" -eq 2 ]] || return 1
+  credentials[0]="${credentials[0]%$'\r'}"
+  credentials[1]="${credentials[1]%$'\r'}"
+  [[ -n "${credentials[0]}" && -n "${credentials[1]}" ]]
 }
 
 icos_identity_configured() {
@@ -143,8 +145,9 @@ _icos_build_manifest() {
 icos_package_day() {
   local day="$1"
   local filename archive metadata manifest registered receipt blocked environment_file
-  local entries_file tmp_archive tmp_manifest tmp_environment archive_size checksum iso_day
-  local -a entries=()
+  local entries_file tmp_archive tmp_manifest tmp_environment checksum iso_day
+  local entry
+  local -a source_entries=() archive_entries=()
 
   filename="${SITENAME}_PHEN_${day}_${ICOS_FILENAME_SUFFIX}.zip"
   archive="${ICOS_OUTBOX_DIR}/${filename}"
@@ -173,18 +176,21 @@ icos_package_day() {
     rm -f -- "$entries_file"
     return "$collect_rc"
   fi
-  mapfile -t entries < "$entries_file"
+  mapfile -t source_entries < "$entries_file"
+  for entry in "${source_entries[@]}"; do
+    [[ "$entry" == *.jpg ]] && archive_entries+=("$entry")
+  done
+  [[ "${#archive_entries[@]}" -gt 0 ]] || {
+    rm -f -- "$entries_file"
+    return 2
+  }
 
-  if ! zip -q -0 -j "$tmp_archive" -- "${entries[@]}"; then
+  # etcPhenocamDaily is an uncompressed ZIP archive with images. META sidecars
+  # remain local and are covered by the source manifest, but are not inserted
+  # into the Carbon Portal data object.
+  if ! zip -q -0 -j "$tmp_archive" -- "${archive_entries[@]}"; then
     rm -f -- "$entries_file" "$tmp_archive"
     warn "Could not create ICOS daily archive: ${filename}"
-    return 1
-  fi
-
-  archive_size="$(stat -c %s "$tmp_archive")"
-  if [[ "$archive_size" -gt "$ICOS_MAX_ZIP_BYTES" ]]; then
-    rm -f -- "$entries_file" "$tmp_archive"
-    warn "ICOS archive exceeds 275 MiB: ${filename} (${archive_size} bytes)"
     return 1
   fi
 
@@ -222,7 +228,7 @@ icos_package_day() {
 _icos_cleanup_uploaded_archive() {
   local archive="$1"
   local manifest="${archive}.manifest" receipt="${archive}.uploaded.json"
-  local expected path actual safe=true
+  local expected path actual safe=true removed=true
 
   [[ -f "$receipt" && -f "$manifest" ]] || return 1
   while IFS=$'\t' read -r expected path; do
@@ -242,8 +248,22 @@ _icos_cleanup_uploaded_archive() {
 
   [[ "$safe" == true ]] || return 1
   while IFS=$'\t' read -r expected path; do
-    [[ -n "$path" ]] && rm -f -- "$path"
+    [[ -n "$path" ]] || continue
+    if [[ -e "$path" ]] && ! rm -f -- "$path"; then
+      warn "Could not remove uploaded ICOS source: ${path}"
+      removed=false
+    fi
   done < "$manifest"
+
+  while IFS=$'\t' read -r expected path; do
+    [[ -n "$path" ]] || continue
+    if [[ -e "$path" ]]; then
+      warn "Uploaded ICOS source is still present: ${path}"
+      removed=false
+    fi
+  done < "$manifest"
+
+  [[ "$removed" == true ]] || return 1
 
   mkdir -p "$ICOS_RECEIPT_DIR"
   mv -- "$receipt" "${ICOS_RECEIPT_DIR}/$(basename -- "$archive").receipt.json"

@@ -62,10 +62,8 @@ append_vision_false() {
   } >>"$meta"
 }
 
-append_vision_privacy_true() {
+append_vision_true() {
   local meta="$1"
-  local image_name
-  image_name="$(basename -- "${meta%.meta}.jpg")"
   {
     printf '\n[detection]\n'
     printf '%s\n' \
@@ -75,7 +73,7 @@ append_vision_privacy_true() {
       'model_id=yolo26n-phenocam' \
       'model_version=0.1.6' \
       'annotated_image=' \
-      "privacy_image=${image_name}" \
+      'privacy_image=' \
       'classes=person' \
       'person_count=1' \
       'total_count=1'
@@ -94,7 +92,7 @@ assert_state() {
 pair="${RAM_QUEUE}/off"
 new_pair "$pair"
 VISION_EDGE_ENABLED=off
-VISION_EDGE_MODE=privacy
+VISION_EDGE_MODE=metadata
 process_detection_pair "${pair}.meta"
 assert_state off "${pair}.meta"
 detection_pair_ready "${pair}.meta"
@@ -112,16 +110,18 @@ assert_state ready "${pair}.meta"
 pair="${RAM_QUEUE}/once"
 new_pair "$pair"
 VISION_EDGE_ENABLED=on
-VISION_EDGE_MODE=privacy
+VISION_EDGE_MODE=metadata
 vision_calls=0
 _run_vision_edge() {
   vision_calls=$((vision_calls + 1))
-  append_vision_privacy_true "$2"
+  append_vision_true "$2"
 }
 process_detection_pair "${pair}.meta"
 process_detection_pair "${pair}.meta"
 [[ "$vision_calls" -eq 1 ]]
 assert_state ready "${pair}.meta"
+! grep -q '^privacy_image=' "${pair}.meta"
+! grep -q '^blurred_image=' "${pair}.meta"
 detection_pair_ready "${pair}.meta"
 
 # A pending pair cannot pass the upload readiness gate.

@@ -4,16 +4,26 @@ IFS=$'\n\t'
 
 # phenocam-usb-detach.sh — called by udev when a USB drive is removed.
 # Works even if the drive was removed without prior unmount (hot-removal).
-# Performs a lazy unmount to cleanly release the mount point, cleans up
-# any orphan .tmp files on SD, and logs the event.
+# Performs a lazy unmount to cleanly release the mount point and logs the
+# event. Queue temporary-file cleanup is performed only by a capture cycle
+# while capture.lock is held.
 # The next capture cycle will automatically fall back to SD queue.
 
 BASE="/usr/local/lib/phenocam"
+SETTINGS="/etc/phenocam/settings.txt"
 source "${BASE}/scripts/common.sh"
-source "${BASE}/scripts/storage_manager.sh"
+source "${BASE}/scripts/config_read.sh"
 
 # Scan USB mount bases for stale mounts (device removed but still in mount table)
 USB_BASES="${USB_MOUNT_BASES:-/media:/mnt}"
+if [[ -r "$SETTINGS" ]]; then
+  if read_settings "$SETTINGS"; then
+    USB_BASES="$USB_MOUNT_BASES"
+  else
+    warn "USB detach: invalid settings; scanning default mount bases"
+    USB_BASES="/media:/mnt"
+  fi
+fi
 IFS=':' read -r -a arr <<< "$USB_BASES"
 
 for base in "${arr[@]}"; do
@@ -30,8 +40,5 @@ for base in "${arr[@]}"; do
     fi
   done
 done
-
-# Clean up any orphan .tmp files on SD (may be left from interrupted writes)
-cleanup_tmp_orphans "$(sd_queue_dir)"
 
 info "USB detach handling complete. Next capture cycle will use SD queue."

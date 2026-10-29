@@ -15,12 +15,17 @@ IFS=$'\n\t'
 # 0  — success
 # 30 — SD above threshold → capture should be skipped
 # 40 — source files missing
+# 41 — destination basename conflicts with an incomplete/different pair
+# 42 — copy, verification or atomic publication failed
 
 ensure_queue_dirs() {
   mkdir -p "$(ram_queue_dir)" "$(sd_queue_dir)"
   local u
   u="$(usb_queue_dir || true)"
-  [[ -n "$u" ]] && mkdir -p "$u"
+  if [[ -n "$u" ]]; then
+    mkdir -p "$u"
+  fi
+  return 0
 }
 
 enqueue_pair() {
@@ -82,7 +87,9 @@ enqueue_pair() {
 
   mkdir -p "$dest_dir"
 
-  # Atomic move: write to .tmp first, then rename.
+  # Copy to temporary destination names first. Keeping the staging originals
+  # until both final files are published allows the next capture cycle to
+  # retry an interrupted transfer, including transfers to another filesystem.
   local base
   base="$(basename "$jpg_src" .jpg)"
 
@@ -91,10 +98,52 @@ enqueue_pair() {
   local jpg_dst="${dest_dir}/${base}.jpg"
   local meta_dst="${dest_dir}/${base}.meta"
 
-  mv -f "$jpg_src" "$jpg_tmp"
-  mv -f "$meta_src" "$meta_tmp"
-  mv -f "$jpg_tmp" "$jpg_dst"
-  mv -f "$meta_tmp" "$meta_dst"
+  # Recover the narrow case in which publication completed but removal of the
+  # staging originals did not. Never overwrite a different or partial pair.
+  if [[ -e "$jpg_dst" || -e "$meta_dst" ]]; then
+    if [[ -f "$jpg_dst" && -f "$meta_dst" ]] &&
+       cmp -s -- "$jpg_src" "$jpg_dst" &&
+       cmp -s -- "$meta_src" "$meta_dst"; then
+      rm -f -- "$jpg_src" "$meta_src"
+      info "Recovered completed enqueue: ${base} -> ${dest_dir}"
+      return 0
+    fi
+    warn "Queue destination conflict: ${base} -> ${dest_dir}"
+    return 41
+  fi
+
+  rm -f -- "$jpg_tmp" "$meta_tmp"
+
+  if ! cp -- "$jpg_src" "$jpg_tmp" || ! cp -- "$meta_src" "$meta_tmp"; then
+    rm -f -- "$jpg_tmp" "$meta_tmp"
+    warn "Queue copy failed: ${base} -> ${dest_dir}"
+    return 42
+  fi
+
+  if ! cmp -s -- "$jpg_src" "$jpg_tmp" ||
+     ! cmp -s -- "$meta_src" "$meta_tmp"; then
+    rm -f -- "$jpg_tmp" "$meta_tmp"
+    warn "Queue copy verification failed: ${base} -> ${dest_dir}"
+    return 42
+  fi
+
+  if ! mv -- "$jpg_tmp" "$jpg_dst"; then
+    rm -f -- "$jpg_tmp" "$meta_tmp"
+    warn "JPEG publication failed: ${base} -> ${dest_dir}"
+    return 42
+  fi
+
+  # META is published last and remains the discovery signal for a complete
+  # pair. Roll back the visible JPEG if META publication fails.
+  if ! mv -- "$meta_tmp" "$meta_dst"; then
+    rm -f -- "$jpg_dst" "$jpg_tmp" "$meta_tmp"
+    warn "META publication failed; JPEG rolled back: ${base} -> ${dest_dir}"
+    return 42
+  fi
+
+  if ! rm -f -- "$jpg_src" "$meta_src"; then
+    warn "Pair published but staging cleanup failed: ${base}"
+  fi
 
   info "Enqueued: ${base} -> ${dest_dir}"
   return 0

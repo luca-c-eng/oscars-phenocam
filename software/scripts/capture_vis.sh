@@ -43,6 +43,8 @@ capture_vis() {
   local SATURATION="${SATURATION:-1.0}"
   local DENOISE="${DENOISE:-off}"
   local EV="${EV:-0}"
+  # Camera Module 3: fixed focus at infinity is intentional for the outdoor
+  # phenocam installation and must remain stable across acquisitions.
   local LENS_POSITION="${LENS_POSITION:-0.0}"
   local QUALITY="${QUALITY:-100}"
 

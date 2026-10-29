@@ -10,9 +10,13 @@ User=phenocam
 Group=phenocam
 SupplementaryGroups=video
 ExecStart=/usr/local/lib/phenocam/bin/phenocam-startup-cycle.sh
-TimeoutStartSec=420
+TimeoutStartSec=1500
 
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
+ProtectSystem=strict
+ProtectHome=true
 ReadWritePaths=/run/phenocam /var/log/phenocam /var/lib/phenocam /media /mnt
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true

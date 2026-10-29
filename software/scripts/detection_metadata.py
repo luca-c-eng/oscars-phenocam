@@ -12,10 +12,10 @@ import sys
 import tempfile
 
 
-MODES = ("metadata", "annotated", "privacy", "delete")
-VISION_FIELDS = {
+MODES = ("metadata", "annotated", "delete")
+VISION_COMMON_FIELDS = {
     "detected", "software_name", "software_version", "model_id", "model_version",
-    "annotated_image", "privacy_image", "classes", "total_count",
+    "annotated_image", "classes", "total_count",
 }
 VISION_IDENTITY = {
     "software_name": "phenocam-detection",
@@ -77,13 +77,16 @@ def _fields(lines: list[str], start: int, end: int) -> dict[str, str]:
     return result
 
 
-def _validate_vision(fields: dict[str, str]) -> None:
+def _validate_vision(fields: dict[str, str], vendor_intermediate: bool) -> None:
     fields = {
         key: value
         for key, value in fields.items()
         if key not in ("filter_enabled", "filter_mode")
     }
-    if not VISION_FIELDS.issubset(fields):
+    expected_fields = VISION_COMMON_FIELDS | (
+        {"privacy_image"} if vendor_intermediate else set()
+    )
+    if not expected_fields.issubset(fields):
         raise MetadataError()
     if any(fields[key] != value for key, value in VISION_IDENTITY.items()):
         raise MetadataError()
@@ -104,7 +107,7 @@ def _validate_vision(fields: dict[str, str]) -> None:
     count_keys = tuple(f"{name.replace(' ', '_')}_count" for name in classes)
     if len(count_keys) != len(set(count_keys)):
         raise MetadataError()
-    if set(fields) != VISION_FIELDS | set(count_keys):
+    if set(fields) != expected_fields | set(count_keys):
         raise MetadataError()
 
     counts = tuple(fields[key] for key in count_keys)
@@ -120,11 +123,12 @@ def _validate_mode_outputs(fields: dict[str, str], path: Path, mode: str) -> Non
     detected = fields["detected"] == "true"
     image_name = path.with_suffix(".jpg").name
     expected_annotated = image_name if detected and mode == "annotated" else ""
-    expected_privacy = image_name if detected and mode == "privacy" else ""
 
     if fields["annotated_image"] != expected_annotated:
         raise MetadataError()
-    if fields["privacy_image"] != expected_privacy:
+    # The ICOS integration never requests the optional blur output offered by
+    # Vision Edge v0.2.3, so the vendor intermediate field must remain empty.
+    if fields["privacy_image"]:
         raise MetadataError()
     if mode == "delete" and detected:
         raise MetadataError()
@@ -157,7 +161,9 @@ def _state(text: str) -> str:
         raise MetadataError()
 
     if not has_enabled:
-        _validate_vision(fields)
+        # Vision Edge v0.2.3 writes the legacy output-field name. It exists
+        # only in this intermediate state and is translated before publication.
+        _validate_vision(fields, vendor_intermediate=True)
         return "vision"
 
     if tuple(fields)[:2] != ("filter_enabled", "filter_mode"):
@@ -171,7 +177,7 @@ def _state(text: str) -> str:
     if fields["filter_enabled"] != "on":
         raise MetadataError()
 
-    _validate_vision(fields)
+    _validate_vision(fields, vendor_intermediate=False)
     return "ready"
 
 
@@ -244,6 +250,13 @@ def mark_on(path: Path, mode: str) -> None:
     _validate_mode_outputs(_fields(lines, start, end), path, mode)
     ending_match = _LINE_ENDING.search(text)
     ending = ending_match.group() if ending_match else "\n"
+    for index in range(start + 1, end):
+        content = _line_content(lines[index])
+        if content.startswith("privacy_image="):
+            del lines[index]
+            break
+    else:
+        raise MetadataError()
     fields = (f"filter_enabled=on{ending}", f"filter_mode={mode}{ending}")
     lines[start + 1 : start + 1] = fields
     _write_atomic(path, "".join(lines), status)

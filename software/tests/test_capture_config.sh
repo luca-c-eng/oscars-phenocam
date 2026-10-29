@@ -27,13 +27,18 @@ BASE_VALUES=(
 )
 printf '%s\n' "${BASE_VALUES[@]}" >"$SETTINGS_23"
 
+# The dedicated development line always resolves the retained legacy backend
+# field to ICOS.
+read_settings "$SETTINGS_23"
+[[ "$REMOTE_LAYOUT" == icos ]]
+
 write_capture_settings() {
   local destination="$1"
   local width="$2"
   local height="$3"
 
   cp -- "$SETTINGS_23" "$destination"
-  printf '%s\n' off privacy "$width" "$height" >>"$destination"
+  printf '%s\n' off metadata "$width" "$height" >>"$destination"
 
   if [[ "$#" -eq 4 ]]; then
     printf '%s\n' "$4" >>"$destination"
@@ -43,7 +48,7 @@ write_capture_settings() {
 # Existing 25-field configurations receive the OSCARS capture defaults.
 SETTINGS_25="${TEST_ROOT}/settings-25.txt"
 cp -- "$SETTINGS_23" "$SETTINGS_25"
-printf '%s\n' off privacy >>"$SETTINGS_25"
+printf '%s\n' off metadata >>"$SETTINGS_25"
 read_settings "$SETTINGS_25"
 [[ "$IMAGE_WIDTH" == 2304 && "$WIDTH" == 2304 ]]
 [[ "$IMAGE_HEIGHT" == 1296 && "$HEIGHT" == 1296 ]]
@@ -85,6 +90,34 @@ for quality in 0 101 93.5 invalid; do
   write_capture_settings "$settings" 2304 1296 "$quality"
   if read_settings "$settings"; then
     printf 'error: invalid JPEG quality accepted: %s\n' "$quality" >&2
+    exit 1
+  fi
+done
+
+# Reject unsafe filename components and values later consumed by arithmetic or
+# storage threshold comparisons.
+for invalid_case in \
+  '1 ../site' \
+  '1 site/name' \
+  '4 24' \
+  '4 invalid' \
+  '5 0' \
+  '4 22|5 6' \
+  '9 satellite' \
+  '10 -1' \
+  '11 0' \
+  '13 101'; do
+  settings="${TEST_ROOT}/settings-invalid-core-${invalid_case//[^A-Za-z0-9]/_}.txt"
+  cp -- "$SETTINGS_23" "$settings"
+  IFS='|' read -r -a replacements <<<"$invalid_case"
+  for replacement in "${replacements[@]}"; do
+    line="${replacement%% *}"
+    value="${replacement#* }"
+    sed -i "${line}s|.*|${value}|" "$settings"
+  done
+  if read_settings "$settings"; then
+    printf 'error: invalid core configuration accepted: %s\n' \
+      "$invalid_case" >&2
     exit 1
   fi
 done

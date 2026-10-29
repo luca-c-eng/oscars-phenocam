@@ -132,10 +132,14 @@ def build_metadata(args: argparse.Namespace) -> None:
 def read_credentials(path: Path) -> tuple[str, str]:
     if not path.is_file() or path.is_symlink():
         raise ConfigurationError(f"Credentials file is unavailable or unsafe: {path}")
-    lines = path.read_text(encoding="utf-8").splitlines()
-    if len(lines) < 2 or not lines[0] or not lines[1]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ConfigurationError(f"Credentials file cannot be read: {path}") from exc
+    if len(lines) != 2 or not lines[0] or not lines[1]:
         raise ConfigurationError(
-            "Credentials file must contain the account email on line 1 and password on line 2"
+            "Credentials file must contain exactly the account email on line 1 "
+            "and password on line 2"
         )
     return lines[0], lines[1]
 
@@ -252,7 +256,12 @@ def upload(args: argparse.Namespace) -> None:
     if not metadata.is_file() or metadata.is_symlink():
         raise ConfigurationError(f"Metadata package is unavailable or unsafe: {metadata}")
 
-    payload = json.loads(metadata.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(metadata.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ConfigurationError(f"Metadata package cannot be read: {metadata}") from exc
+    if not isinstance(payload, dict):
+        raise ConfigurationError("Metadata package must contain one JSON object")
     checksum = sha256_hex(archive)
     if payload.get("hashSum") != checksum or payload.get("fileName") != archive.name:
         raise ConfigurationError("Archive no longer matches its metadata package")
@@ -262,9 +271,21 @@ def upload(args: argparse.Namespace) -> None:
     cookie_jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
     authenticate(opener, endpoints["auth"], email, password)
+    # Fail before metadata registration when CPauth returned a successful HTTP
+    # response without the authentication cookie required by both services.
+    cookie_header(cookie_jar, endpoints["meta"])
 
     if registered_path.exists():
-        registration_response = registered_path.read_text(encoding="utf-8").strip()
+        if not registered_path.is_file() or registered_path.is_symlink():
+            raise ConfigurationError(
+                f"Registration marker is unavailable or unsafe: {registered_path}"
+            )
+        try:
+            registration_response = registered_path.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise ConfigurationError(
+                f"Registration marker cannot be read: {registered_path}"
+            ) from exc
     else:
         registration_response = post_metadata(opener, endpoints["meta"], metadata)
         atomic_write(registered_path, (registration_response + "\n").encode(), 0o600)

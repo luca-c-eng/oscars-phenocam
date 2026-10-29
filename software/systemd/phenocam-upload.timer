@@ -2,9 +2,8 @@
 Description=PhenoCam upload timer
 
 [Timer]
-OnBootSec=3min
-OnUnitActiveSec=9min
-AccuracySec=30s
+OnCalendar=*-*-* *:01,31:00 UTC
+AccuracySec=10s
 Persistent=false
 
 [Install]
