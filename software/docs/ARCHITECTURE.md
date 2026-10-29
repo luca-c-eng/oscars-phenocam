@@ -31,10 +31,18 @@ The installer chooses one random `CAPTURE_MINUTE` in the range allowed by
 `INTERVAL_MIN` and stores it in `settings.txt`. This value is persistent: it is
 reused after reboots and upgrades until an operator explicitly changes it.
 
-For the default interval of 30 minutes, a stored value of `13` produces capture
-requests at `:13` and `:43`. The upload service is requested one minute later.
-Distributing these stable offsets among installations prevents all stations
-from contacting the service at the same minute.
+With the default 30-minute interval, each new installation randomly selects
+one offset from `0` to `29` and stores it permanently. For example, if the
+selected value is `13`, capture requests occur at `:13` and `:43`; a different
+installation may select another offset. The upload service is requested one
+minute after each scheduled capture. These stable, installation-specific
+offsets distribute requests over time instead of making every station contact
+the service during the same minute.
+
+Systemd catch-up execution is disabled for both timers. After downtime, the
+system waits for the next assigned minute instead of creating an off-schedule
+image. The capture-plus-upload startup cycle remains available only as an
+explicit diagnostic command.
 
 ## Capture and Queue Flow
 
@@ -67,9 +75,11 @@ state, so completed pairs are not analysed again.
 | `off` | Screening disabled for this pair | Yes |
 | `ready` | Screening result validated | Yes |
 
-The configured modes are `metadata`, `annotated`, `privacy` and `delete`.
-Failures retain the pair for a later cycle. A positive `delete` result removes
-the pair before it can enter a daily product.
+The configured modes are `metadata`, `annotated` and `delete`. The default
+`metadata` mode records detections without changing the JPEG. A positive
+`delete` result removes the pair before it can enter a daily product. Image
+blurring is not part of the ICOS workflow. Failures retain the pair for a later
+cycle.
 
 ## Daily ICOS Product
 
