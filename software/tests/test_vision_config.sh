@@ -50,12 +50,22 @@ printf '%s\n' \
 # A v1.7.0 file keeps working and receives the v1.8.0 defaults.
 read_settings "$SETTINGS_23"
 [[ "$VISION_EDGE_ENABLED" == off ]]
-[[ "$VISION_EDGE_MODE" == privacy ]]
+[[ "$VISION_EDGE_MODE" == metadata ]]
+validate_vision_edge_settings
+
+# The former blur-action value is accepted only as a migration input and is
+# reduced to metadata-only processing in the ICOS build.
+SETTINGS_LEGACY_MODE="${TEST_ROOT}/settings-legacy-mode.txt"
+cp -- "$SETTINGS_23" "$SETTINGS_LEGACY_MODE"
+printf '%s\n%s\n' on privacy >>"$SETTINGS_LEGACY_MODE"
+read_settings "$SETTINGS_LEGACY_MODE"
+[[ "$VISION_EDGE_ENABLED" == on ]]
+[[ "$VISION_EDGE_MODE" == metadata ]]
 validate_vision_edge_settings
 
 # Every documented v1.8.0 value is accepted.
 for enabled in on off; do
-  for mode in metadata annotated privacy delete; do
+  for mode in metadata annotated delete; do
     SETTINGS_25="${TEST_ROOT}/settings-${enabled}-${mode}.txt"
     cp -- "$SETTINGS_23" "$SETTINGS_25"
     printf '%s\n%s\n' "$enabled" "$mode" >>"$SETTINGS_25"
@@ -70,7 +80,7 @@ done
 # This separation keeps capture configuration loading backward compatible.
 SETTINGS_INVALID_ENABLED="${TEST_ROOT}/settings-invalid-enabled.txt"
 cp -- "$SETTINGS_23" "$SETTINGS_INVALID_ENABLED"
-printf '%s\n%s\n' yes privacy >>"$SETTINGS_INVALID_ENABLED"
+printf '%s\n%s\n' yes metadata >>"$SETTINGS_INVALID_ENABLED"
 read_settings "$SETTINGS_INVALID_ENABLED"
 if validate_vision_edge_settings; then
   exit 1
@@ -78,7 +88,7 @@ fi
 
 SETTINGS_INVALID_MODE="${TEST_ROOT}/settings-invalid-mode.txt"
 cp -- "$SETTINGS_23" "$SETTINGS_INVALID_MODE"
-printf '%s\n%s\n' on 'privacy;id' >>"$SETTINGS_INVALID_MODE"
+printf '%s\n%s\n' on 'blur;id' >>"$SETTINGS_INVALID_MODE"
 read_settings "$SETTINGS_INVALID_MODE"
 if validate_vision_edge_settings; then
   exit 1

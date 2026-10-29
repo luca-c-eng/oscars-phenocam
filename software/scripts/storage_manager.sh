@@ -46,7 +46,8 @@ usb_is_mounted() {
 }
 
 # cleanup_tmp_orphans <dir> — removes orphan .tmp files in a queue directory.
-# Call only when no capture cycle is active (lock not held).
+# Call while capture.lock is held. Queue consumers discover only final .meta
+# files, so temporary queue files are never valid upload work.
 cleanup_tmp_orphans() {
   local dir="$1"
   [[ -d "$dir" ]] || return 0
@@ -56,6 +57,20 @@ cleanup_tmp_orphans() {
     warn "Removing orphan .tmp file: $(basename "$f")"
     rm -f "$f" || true
   done
+}
+
+# cleanup_all_queue_tmp_orphans — removes temporary files left by an
+# interrupted queue publication. The caller must hold capture.lock.
+cleanup_all_queue_tmp_orphans() {
+  cleanup_tmp_orphans "$(ram_queue_dir)"
+  cleanup_tmp_orphans "$(sd_queue_dir)"
+
+  local u
+  u="$(usb_queue_dir || true)"
+  if [[ -n "$u" ]]; then
+    cleanup_tmp_orphans "$u"
+  fi
+  return 0
 }
 
 # fs_used_pct <path> — returns the used percentage of the filesystem containing <path>.

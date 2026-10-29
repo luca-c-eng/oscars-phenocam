@@ -8,14 +8,16 @@ Requires=phenocam-init.service run-phenocam.mount
 Type=oneshot
 User=phenocam
 Group=phenocam
-TimeoutStartSec=900
+# CPauth (60 s), metadata POST (120 s) and data PUT (900 s) execute
+# sequentially. Keep the service timeout above their combined client limits.
+TimeoutStartSec=1200
 ExecStart=/usr/local/lib/phenocam/bin/phenocam-upload.sh
 
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/run/phenocam /var/log/phenocam /var/lib/phenocam /media /mnt /etc/phenocam
+ReadWritePaths=/run/phenocam /var/log/phenocam /var/lib/phenocam /media /mnt
 RestrictSUIDSGID=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=yes

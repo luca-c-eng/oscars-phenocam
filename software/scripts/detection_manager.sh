@@ -58,7 +58,6 @@ _run_vision_edge() {
   case "$VISION_EDGE_MODE" in
     metadata) ;;
     annotated) command+=(--annotated-output "$jpg_name") ;;
-    privacy) command+=(--privacy-output "$jpg_name") ;;
     delete) command+=(--delete-input-on-detection) ;;
     *) return 64 ;;
   esac

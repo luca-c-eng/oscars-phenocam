@@ -31,7 +31,7 @@ software_version=0.2.3
 model_id=yolo26n-phenocam
 model_version=0.1.6
 annotated_image=
-privacy_image=image.jpg
+privacy_image=
 classes=person,car
 person_count=1
 car_count=2
@@ -68,25 +68,28 @@ class DetectionMetadataTests(unittest.TestCase):
     def test_mark_off_appends_only_integration_fields_atomically(self):
         self.write(BASE)
         before_inode = self.meta.stat().st_ino
-        MODULE.mark_off(self.meta, "privacy")
+        MODULE.mark_off(self.meta, "metadata")
         updated = self.meta.read_text(encoding="utf-8")
         self.assertEqual(self.state(), "off")
         self.assertIn(
-            "[detection]\nfilter_enabled=off\nfilter_mode=privacy\n", updated
+            "[detection]\nfilter_enabled=off\nfilter_mode=metadata\n",
+            updated,
         )
         self.assertIn(BASE, updated)
         self.assertNotEqual(self.meta.stat().st_ino, before_inode)
         self.assertEqual(stat.S_IMODE(self.meta.stat().st_mode), 0o640)
 
-    def test_mark_on_inserts_fields_before_valid_privacy_result(self):
+    def test_mark_on_removes_unused_vendor_output_field(self):
         self.write(BASE + "\n" + VISION_TRUE)
-        MODULE.mark_on(self.meta, "privacy")
+        MODULE.mark_on(self.meta, "metadata")
         updated = self.meta.read_text(encoding="utf-8")
         self.assertEqual(self.state(), "ready")
         self.assertIn(
-            "[detection]\nfilter_enabled=on\nfilter_mode=privacy\ndetected=true\n",
+            "[detection]\nfilter_enabled=on\nfilter_mode=metadata\ndetected=true\n",
             updated,
         )
+        self.assertNotIn("privacy_image", updated)
+        self.assertNotIn("blurred_image", updated)
 
     def test_vendor_false_is_complete_metadata_inference(self):
         self.write(BASE + "\n" + VISION_FALSE)
@@ -96,7 +99,7 @@ class DetectionMetadataTests(unittest.TestCase):
 
     def test_annotated_mode_requires_annotated_image_name(self):
         annotated = VISION_TRUE.replace(
-            "annotated_image=\nprivacy_image=image.jpg",
+            "annotated_image=\nprivacy_image=",
             "annotated_image=image.jpg\nprivacy_image=",
         )
         self.write(BASE + "\n" + annotated)
@@ -105,7 +108,7 @@ class DetectionMetadataTests(unittest.TestCase):
 
     def test_crlf_is_retained_for_added_section(self):
         self.meta.write_bytes(BASE.replace("\n", "\r\n").encode())
-        MODULE.mark_off(self.meta, "privacy")
+        MODULE.mark_off(self.meta, "metadata")
         self.assertNotIn(b"\n", self.meta.read_bytes().replace(b"\r\n", b""))
 
     def test_wrong_vendor_identity_is_rejected(self):
@@ -144,13 +147,13 @@ class DetectionMetadataTests(unittest.TestCase):
         self.assert_invalid(VISION_TRUE.replace("classes=person,car", "classes=person,person"))
 
     def test_mark_on_rejects_output_for_wrong_mode(self):
-        self.write(BASE + "\n" + VISION_TRUE)
+        annotated = VISION_TRUE.replace("annotated_image=", "annotated_image=image.jpg")
+        self.write(BASE + "\n" + annotated)
         with self.assertRaises(MODULE.MetadataError):
             MODULE.mark_on(self.meta, "metadata")
 
     def test_delete_mode_rejects_detected_result(self):
-        detected_without_outputs = VISION_TRUE.replace("privacy_image=image.jpg", "")
-        self.write(BASE + "\n" + detected_without_outputs)
+        self.write(BASE + "\n" + VISION_TRUE)
         with self.assertRaises(MODULE.MetadataError):
             MODULE.mark_on(self.meta, "delete")
 

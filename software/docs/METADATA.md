@@ -20,7 +20,9 @@ The metadata lifecycle is:
 1. generate the filename timestamp;
 2. capture the JPEG in `/run/phenocam/staging`;
 3. generate the `.meta` sidecar;
-4. attempt to move both files into the selected queue.
+4. copy both files to temporary names in the selected queue;
+5. verify both copies and publish the JPEG followed by the `.meta` sidecar;
+6. remove the staging originals after successful publication.
 
 If the camera command fails, metadata generation is not attempted.
 
@@ -44,7 +46,7 @@ Immediately after capture, each generated `.meta` file contains five sections:
 
 The first four sections contain `key=value` records. The `[exif]` section contains grouped text returned by `exiftool`.
 
-During queue processing, v1.8.0 appends a sixth section:
+During queue processing, the Vision Edge integration appends a sixth section:
 
 ```text
 [detection]
@@ -171,8 +173,8 @@ For the diagnostic output implemented by the software, see [System Health and Th
 
 | Field           | Default value |
 | --------------- | ------------: |
-| `width`         |        `4608` |
-| `height`        |        `2592` |
+| `width`         |        `2304` |
+| `height`        |        `1296` |
 | `awb`           |    `daylight` |
 | `gain`          |         `1.0` |
 | `sharpness`     |         `1.0` |
@@ -185,6 +187,8 @@ For the diagnostic output implemented by the software, see [System Health and Th
 | `quality`       |         `100` |
 
 These are the default values passed to `rpicam-still` or `libcamera-still`.
+The lens position of `0.0` intentionally fixes Camera Module 3 focus at
+infinity for the outdoor phenocam configuration.
 
 The capture script accepts environment-variable overrides with the same names. When an override is present in the process environment, the corresponding metadata field uses that value.
 
@@ -238,14 +242,13 @@ result. OSCARS-PHENOCAM validates that result and atomically inserts
 ```ini
 [detection]
 filter_enabled=on
-filter_mode=<metadata|annotated|privacy|delete>
+filter_mode=<metadata|annotated|delete>
 detected=<true|false>
 software_name=phenocam-detection
 software_version=0.2.3
 model_id=yolo26n-phenocam
 model_version=0.1.6
 annotated_image=<JPEG filename or empty>
-privacy_image=<JPEG filename or empty>
 classes=<comma-separated class names or empty>
 <class_key>_count=<positive integer>
 total_count=<sum of class counts or 0>
@@ -261,7 +264,6 @@ total_count=<sum of class counts or 0>
 | `model_id` | Model identifier read from the installed receipt: `yolo26n-phenocam`. |
 | `model_version` | Model version read from the installed receipt: `0.1.6`. |
 | `annotated_image` | Queued JPEG filename for a positive `annotated` result; otherwise empty. |
-| `privacy_image` | Queued JPEG filename for a positive `privacy` result; otherwise empty. |
 | `classes` | Detected enabled class names in a comma-separated list, or empty. |
 | `<class_key>_count` | Positive count for a detected class; spaces in its class name become underscores. |
 | `total_count` | Sum of all per-class counts, or `0`. |
@@ -272,7 +274,6 @@ result contains no per-class count fields and uses:
 ```ini
 detected=false
 annotated_image=
-privacy_image=
 classes=
 total_count=0
 ```
@@ -283,7 +284,6 @@ total_count=0
 | ---- | ------------------------ |
 | `metadata` | Image-path fields remain empty for positive and negative results. |
 | `annotated` | `annotated_image` contains the JPEG filename only for a positive result. |
-| `privacy` | `privacy_image` contains the JPEG filename only for a positive result. |
 | `delete` | A negative result is retained with empty image paths; a positive result deletes both the JPEG and `.meta` file. |
 
 Because a positive `delete` result removes the pair, no corresponding final
@@ -316,8 +316,9 @@ CAMERA_MODEL
 CAPTURE_TIMEOUT
 ```
 
-`INTERVAL_MIN`, `BOARD` and `CAMERA_MODEL` are exported but have no further
-runtime consumer in `dev/v1.8.0`.
+`INTERVAL_MIN` is consumed by the schedule configurator together with
+`CAPTURE_MINUTE`. `BOARD` and `CAMERA_MODEL` remain available to runtime
+components but are not written to this sidecar.
 
 `CAPTURE_TIMEOUT` is used by the camera command but is not recorded in the sidecar.
 
@@ -327,22 +328,34 @@ and `filter_mode` in `[detection]`.
 
 ---
 
-## Queue and Upload Lifecycle
+## Queue and Daily Product Lifecycle
 
-The generated JPEG and metadata files are moved from staging to temporary queue names:
+The generated JPEG and metadata files are copied from staging to temporary
+queue names:
 
 ```text
 <basename>.jpg.tmp
 <basename>.meta.tmp
 ```
 
-The JPEG receives its final name before the metadata file receives its final name.
+The copies are verified before publication. The JPEG receives its final name
+before the metadata file receives its final name, and staging originals are
+removed only after both final files exist. A complete staging pair retained by
+an interrupted publication is retried before the next acquisition.
+
+After optional screening, complete pairs from the same station-local calendar
+day are used to create one uncompressed ICOS ZIP containing the JPEG images.
+The `.meta` sidecars are not inserted into the image-only Carbon Portal data
+object. They remain locally associated with the source JPEGs through the
+packaging manifest until upload confirmation and verified cleanup.
 
 The detection manager discovers work first by listing final `.meta` files. The
 uploader later processes a pair only when the matching final `.jpg` exists and
 the detection state is `off` or `ready`.
 
-When an enabled upload attempt fails, both local files remain queued. They are removed only after every enabled upload succeeds.
+When an upload attempt fails, both local files remain queued. They are removed
+only after the ICOS data-service upload succeeds and their hashes still match
+the packaging manifest.
 
 For the complete publication and upload flow, see [Software Architecture](ARCHITECTURE.md).
 

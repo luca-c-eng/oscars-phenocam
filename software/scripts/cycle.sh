@@ -5,7 +5,7 @@ IFS=$'\n\t'
 # cycle.sh — capture cycle orchestrator.
 # Handles: time window check, orphan cleanup, image capture,
 # metadata build, and queue enqueue (RAMDISK / USB / SD).
-# Upload is handled separately by uploader_daemon.sh (dedicated timer).
+# Daily ICOS packaging and upload are handled by a dedicated timer.
 
 cycle_once() {
   local settings="$1"
@@ -27,8 +27,34 @@ cycle_once() {
 
   mkdir -p "$ram_base/staging"
 
-  # Clean up orphan files in staging: remove any .jpg/.meta left over from
-  # a previous cycle that failed after capture but before enqueue.
+  # An interrupted cross-filesystem publication can leave temporary queue
+  # files and a complete pair in staging. Remove only undiscoverable .tmp
+  # queue files, then retry every complete staged pair before acquiring a new
+  # image. capture.lock is already held by phenocam-capture.sh.
+  cleanup_all_queue_tmp_orphans
+
+  local staged_meta staged_jpg staged_rc
+  for staged_meta in "$ram_base"/staging/*.meta; do
+    [[ -f "$staged_meta" ]] || continue
+    staged_jpg="${staged_meta%.meta}.jpg"
+    [[ -f "$staged_jpg" ]] || continue
+
+    warn "Retrying complete pair from staging: $(basename "${staged_meta%.meta}")"
+    if enqueue_pair "$staged_jpg" "$staged_meta"; then
+      continue
+    else
+      staged_rc=$?
+    fi
+
+    if [[ "$staged_rc" -eq 30 ]]; then
+      warn "Staged pair retained because persistent storage is above threshold"
+      return 0
+    fi
+    die "Recovery enqueue_pair failed with rc=$staged_rc"
+  done
+
+  # Remove only incomplete staging files left by a capture or metadata failure.
+  # Complete pairs were recovered above.
   # Safe to do here because capture.lock is already held by with_lock in
   # phenocam-capture.sh — no other cycle can be writing to staging.
   local orphan

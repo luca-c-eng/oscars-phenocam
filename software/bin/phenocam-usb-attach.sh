@@ -9,7 +9,14 @@ IFS=$'\n\t'
 # storage when the RAMDISK falls below RAM_MIN_FREE_MB (see settings.txt).
 
 BASE="/usr/local/lib/phenocam"
+SETTINGS="/etc/phenocam/settings.txt"
 source "${BASE}/scripts/common.sh"
+source "${BASE}/scripts/config_read.sh"
+
+if [[ -r "$SETTINGS" ]] && ! read_settings "$SETTINGS"; then
+  warn "USB attach: invalid settings; scanning default mount bases"
+  USB_MOUNT_BASES="/media:/mnt"
+fi
 
 # Wait for the automount to complete (udisks2 typically takes ~2-3 seconds)
 sleep 3
@@ -23,5 +30,5 @@ if [[ -n "$mp" ]]; then
   mkdir -p "${mp}/phenocam_queue" || true
   chown phenocam:phenocam "${mp}/phenocam_queue" 2>/dev/null || true
 else
-  warn "USB attach event received but no mountpoint found. Check filesystem format (must be FAT32)."
+  warn "USB attach event received but no writable mounted filesystem was found."
 fi

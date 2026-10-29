@@ -56,9 +56,15 @@ flowchart TD
 ```
 
 The JPEG and `.meta` sidecar are generated in `/run/phenocam/staging`. Queue
-publication uses temporary names and renames the JPEG first and the metadata
-file last. The final `.meta` filename is therefore the discovery signal for a
-complete pair.
+publication copies both files to temporary destination names, verifies the
+copies and then renames the JPEG first and the metadata file last. The final
+`.meta` filename is therefore the discovery signal for a complete pair. The
+staging originals are removed only after successful publication; a complete
+pair retained after an interruption is retried before the next acquisition.
+
+Camera Module 3 acquisition intentionally uses a fixed lens position of `0.0`
+(focus at infinity) to preserve the selected outdoor imaging configuration
+across acquisitions.
 
 Queue selection is RAM first, then a writable USB queue, then the SD fallback.
 Queue processing is ordered USB, SD, RAM.
@@ -88,8 +94,8 @@ For each closed station-local calendar day, the manager:
 1. discovers all complete `.jpg`/`.meta` pairs belonging to that day;
 2. verifies that every pair is in the `off` or `ready` state;
 3. rejects duplicate basenames across queues;
-4. creates one root-level, uncompressed ZIP;
-5. records a SHA-256 manifest of every source file;
+4. creates one root-level, uncompressed ZIP containing the JPEG images;
+5. records a local SHA-256 manifest of every source JPEG and sidecar;
 6. calculates the final ZIP SHA-256 checksum;
 7. creates the Carbon Portal JSON metadata package.
 

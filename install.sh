@@ -16,7 +16,7 @@ IFS=$'\n\t'
 #
 # What this script does:
 #   1. Checks prerequisites (OS, hardware, network)
-#   2. Installs system dependencies (git, exiftool)
+#   2. Installs system dependencies (git, exiftool, Python and zip)
 #   3. Clones or updates the repository from GitHub
 #   4. Verifies all expected critical files are present
 #   5. Installs and verifies Phenocam Vision Edge v0.2.3
@@ -29,7 +29,7 @@ IFS=$'\n\t'
 #
 # After installation, configure:
 #   sudo nano /etc/phenocam/settings.txt
-#   sudo nano /etc/phenocam/ftp_credentials.txt
+#   sudo nano /etc/phenocam/cp_credentials.txt
 #
 # Normal flow:
 #   install -> configure -> reboot -> timers start automatically at boot
@@ -162,8 +162,15 @@ fi
   >/dev/null 2>&1 || log_fatal "Phenocam Vision Edge requires Python 3.13."
 log_ok "Python: $(/usr/bin/python3 --version)"
 
+# Install the ZIP utility required for uncompressed ICOS daily products.
+if ! command -v zip >/dev/null 2>&1; then
+  sudo apt-get install -y zip
+fi
+command -v zip >/dev/null 2>&1 || log_fatal "zip installation failed."
+log_ok "zip: $(command -v zip)"
+
 # Verify other required tools.
-for tool in rpicam-still curl sftp flock; do
+for tool in rpicam-still curl flock sha256sum cmp; do
   if command -v "$tool" >/dev/null 2>&1; then
     log_ok "$tool: $(command -v "$tool")"
   else
@@ -195,7 +202,10 @@ log_ok "Repository ready at: $INSTALL_DIR"
 # ── Step 4 — Verify downloaded files ─────────────────────────────────────────
 log_step "Verifying downloaded files..."
 
-ACTUAL_COUNT="$(find "$INSTALL_DIR" -type f | wc -l)"
+ACTUAL_COUNT="$(
+  find "$INSTALL_DIR" -path "$INSTALL_DIR/.git" -prune -o -type f -print \
+    | wc -l
+)"
 if [[ "$ACTUAL_COUNT" -ge "$EXPECTED_FILE_COUNT" ]]; then
   log_ok "File count: $ACTUAL_COUNT (expected >= $EXPECTED_FILE_COUNT)"
 else
@@ -210,19 +220,25 @@ CRITICAL_FILES=(
   "${SOFTWARE_DIR}/bin/phenocam-init-ramdisk.sh"
   "${SOFTWARE_DIR}/bin/phenocam-usb-attach.sh"
   "${SOFTWARE_DIR}/bin/phenocam-usb-detach.sh"
+  "${SOFTWARE_DIR}/bin/diag_upload.sh"
 
   "${SOFTWARE_DIR}/scripts/common.sh"
   "${SOFTWARE_DIR}/scripts/config_read.sh"
   "${SOFTWARE_DIR}/scripts/cycle.sh"
+  "${SOFTWARE_DIR}/scripts/capture_vis.sh"
   "${SOFTWARE_DIR}/scripts/meta_build.sh"
+  "${SOFTWARE_DIR}/scripts/net_check.sh"
   "${SOFTWARE_DIR}/scripts/queue_manager.sh"
-  "${SOFTWARE_DIR}/scripts/upload_sftp.sh"
-  "${SOFTWARE_DIR}/scripts/upload_ftp.sh"
-  "${SOFTWARE_DIR}/scripts/uploader_daemon.sh"
+  "${SOFTWARE_DIR}/scripts/storage_manager.sh"
   "${SOFTWARE_DIR}/scripts/detection_manager.sh"
   "${SOFTWARE_DIR}/scripts/detection_metadata.py"
+  "${SOFTWARE_DIR}/scripts/icos_client.py"
+  "${SOFTWARE_DIR}/scripts/icos_manager.sh"
+  "${SOFTWARE_DIR}/scripts/schedule_manager.sh"
+  "${SOFTWARE_DIR}/bin/phenocam-configure-schedule.sh"
 
   "${SOFTWARE_DIR}/config/phenocam.logrotate"
+  "${SOFTWARE_DIR}/config/settings_example.txt"
 
   "${SOFTWARE_DIR}/systemd/phenocam-init.service"
   "${SOFTWARE_DIR}/systemd/phenocam-capture.service"
@@ -373,9 +389,11 @@ sudo mkdir -p \
   "${LIB_DIR}/bin" \
   "${LIB_DIR}/scripts" \
   "${LIB_DIR}/docs" \
-  "${CONFIG_DIR}/keys" \
+  "${CONFIG_DIR}" \
   "${LOG_DIR}" \
-  "/var/lib/phenocam/queue"
+  "/var/lib/phenocam/queue" \
+  "/var/lib/phenocam/icos-outbox" \
+  "/var/lib/phenocam/icos-receipts"
 
 log_ok "Directory structure created"
 
@@ -390,6 +408,17 @@ sudo cp "${SOFTWARE_DIR}/bin/"*.sh     "${LIB_DIR}/bin/"
 sudo chmod +x "${LIB_DIR}/bin/"*.sh "${LIB_DIR}/scripts/"*.sh
 sudo chmod 644 "${LIB_DIR}/scripts/"*.py
 log_ok "Runtime scripts deployed"
+
+# Remove executable transfer backends left by an upgrade from an earlier
+# installation. Their source remains available in Git history, but this branch
+# exposes only the ICOS workflow.
+for legacy_runtime in upload_ftp.sh upload_sftp.sh uploader_daemon.sh; do
+  if sudo test -e "${LIB_DIR}/scripts/${legacy_runtime}" || \
+     sudo test -L "${LIB_DIR}/scripts/${legacy_runtime}"; then
+    sudo unlink "${LIB_DIR}/scripts/${legacy_runtime}"
+    log_ok "Removed legacy runtime: ${legacy_runtime}"
+  fi
+done
 
 # Copy local documentation if present.
 if [[ -d "${SOFTWARE_DIR}/docs" ]]; then
@@ -429,15 +458,18 @@ log_ok "Runtime BUILD_INFO installed to ${LIB_DIR}/BUILD_INFO"
 # Set permissions.
 sudo chmod 750 \
   "${CONFIG_DIR}" \
-  "${CONFIG_DIR}/keys" \
   "${LOG_DIR}" \
   "/var/lib/phenocam" \
-  "/var/lib/phenocam/queue"
+  "/var/lib/phenocam/queue" \
+  "/var/lib/phenocam/icos-outbox" \
+  "/var/lib/phenocam/icos-receipts"
 
 sudo chown phenocam:phenocam \
   "${LOG_DIR}" \
   "/var/lib/phenocam" \
-  "/var/lib/phenocam/queue"
+  "/var/lib/phenocam/queue" \
+  "/var/lib/phenocam/icos-outbox" \
+  "/var/lib/phenocam/icos-receipts"
 
 log_ok "Permissions set"
 
@@ -446,7 +478,8 @@ log_step "Creating configuration files..."
 
 # settings.txt — create only if not already present.
 if ! sudo test -f "${CONFIG_DIR}/settings.txt"; then
-  sudo tee "${CONFIG_DIR}/settings.txt" >/dev/null <<'SETTINGS'
+  CAPTURE_MINUTE_INITIAL="$(( $(od -An -N2 -tu2 /dev/urandom) % 30 ))"
+  sudo tee "${CONFIG_DIR}/settings.txt" >/dev/null <<SETTINGS
 mysite
 +1
 UTC+1
@@ -460,7 +493,7 @@ auto
 80
 /media:/mnt
 90
-general
+icos
 nd
 nd
 nd
@@ -471,7 +504,16 @@ unknown
 imx708
 30000
 off
-privacy
+metadata
+2304
+1296
+100
+staging
+nd
+nd
+nd
+nd
+${CAPTURE_MINUTE_INITIAL}
 SETTINGS
 
   log_ok "settings.txt created (edit to set your SITENAME and parameters)"
@@ -484,85 +526,111 @@ SETTINGS
   # IFACE=auto lets runtime networking follow the active/default route.
 
   log_ok "Board written to settings.txt: ${DETECTED_BOARD:-unknown}"
+  log_ok "Persistent capture minute selected: ${CAPTURE_MINUTE_INITIAL}"
 else
   log_ok "settings.txt already exists — not overwritten"
+
+  # Extend supported earlier layouts without changing their existing values.
+  # The random minute is generated once from the configured interval and then
+  # persists as field 34.
+  EFFECTIVE_SETTINGS_COUNT="$(sudo awk '
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+    { count++ }
+    END { print count + 0 }
+  ' "${CONFIG_DIR}/settings.txt")"
+  if [[ "$EFFECTIVE_SETTINGS_COUNT" =~ ^(23|25|27|28)$ ]]; then
+    EFFECTIVE_INTERVAL="$(sudo awk '
+      { sub(/\r$/, "") }
+      /^[[:space:]]*#/ { next }
+      /^[[:space:]]*$/ { next }
+      { count++; if (count == 6) { print; exit } }
+    ' "${CONFIG_DIR}/settings.txt")"
+    case "$EFFECTIVE_INTERVAL" in
+      5|10|15|20|30|60) ;;
+      *) log_fatal "Existing settings contains an unsupported acquisition interval: ${EFFECTIVE_INTERVAL}" ;;
+    esac
+    CAPTURE_MINUTE_INITIAL="$(( $(od -An -N2 -tu2 /dev/urandom) % EFFECTIVE_INTERVAL ))"
+
+    case "$EFFECTIVE_SETTINGS_COUNT" in
+      23)
+        sudo tee -a "${CONFIG_DIR}/settings.txt" >/dev/null <<SETTINGS
+off
+metadata
+2304
+1296
+100
+staging
+nd
+nd
+nd
+nd
+${CAPTURE_MINUTE_INITIAL}
+SETTINGS
+        ;;
+      25)
+        sudo tee -a "${CONFIG_DIR}/settings.txt" >/dev/null <<SETTINGS
+2304
+1296
+100
+staging
+nd
+nd
+nd
+nd
+${CAPTURE_MINUTE_INITIAL}
+SETTINGS
+        ;;
+      27)
+        sudo tee -a "${CONFIG_DIR}/settings.txt" >/dev/null <<SETTINGS
+100
+staging
+nd
+nd
+nd
+nd
+${CAPTURE_MINUTE_INITIAL}
+SETTINGS
+        ;;
+      28)
+        sudo tee -a "${CONFIG_DIR}/settings.txt" >/dev/null <<SETTINGS
+staging
+nd
+nd
+nd
+nd
+${CAPTURE_MINUTE_INITIAL}
+SETTINGS
+        ;;
+    esac
+    log_ok "Existing ${EFFECTIVE_SETTINGS_COUNT}-field settings migrated to the ICOS layout"
+    log_ok "Persistent capture minute selected: ${CAPTURE_MINUTE_INITIAL}"
+  elif [[ "$EFFECTIVE_SETTINGS_COUNT" -lt 34 ]]; then
+    log_warn "Existing settings has ${EFFECTIVE_SETTINGS_COUNT} effective fields; review it against settings_example.txt before reboot."
+  fi
 fi
 
-# server.txt — empty placeholder for SFTP.
-if ! sudo test -f "${CONFIG_DIR}/server.txt"; then
-  sudo touch "${CONFIG_DIR}/server.txt"
-  log_ok "server.txt created (empty — SFTP disabled)"
+# Carbon Portal credentials — account email on line 1, password on line 2.
+# The file is separate from settings.txt so secrets are never exported as
+# general runtime configuration or copied into image metadata.
+if ! sudo test -f "${CONFIG_DIR}/cp_credentials.txt"; then
+  sudo touch "${CONFIG_DIR}/cp_credentials.txt"
+  log_ok "cp_credentials.txt created (empty — ICOS upload disabled until configured)"
 else
-  log_ok "server.txt already exists — not overwritten"
-fi
-
-# ftp_credentials.txt — comment-only placeholder.
-if ! sudo test -f "${CONFIG_DIR}/ftp_credentials.txt"; then
-  sudo tee "${CONFIG_DIR}/ftp_credentials.txt" >/dev/null <<'FTP'
-# FTP credentials — one value per line, uncomment only after configuration.
-# 1) FTP_HOST        e.g. 5.249.152.25
-# 2) FTP_PORT        e.g. 21, or provider-defined FTP port such as 22
-# 3) FTP_REMOTE_BASE e.g. /phenocams/data
-# 4) FTP_USER
-# 5) FTP_PASS
-FTP
-
-  log_ok "ftp_credentials.txt created (comment-only — FTP disabled until configured)"
-  log_warn "ACTION REQUIRED: sudo nano ${CONFIG_DIR}/ftp_credentials.txt — set real FTP credentials"
-else
-  log_ok "ftp_credentials.txt already exists — not overwritten"
-fi
-
-# known_hosts — empty placeholder for SFTP.
-if ! sudo test -f "${CONFIG_DIR}/known_hosts"; then
-  sudo touch "${CONFIG_DIR}/known_hosts"
-  log_ok "known_hosts created (empty)"
-else
-  log_ok "known_hosts already exists — not overwritten"
+  log_ok "cp_credentials.txt already exists — not overwritten"
 fi
 
 # Configuration files must be readable by phenocam but not world-readable.
 sudo chown root:phenocam \
   "${CONFIG_DIR}/settings.txt" \
-  "${CONFIG_DIR}/server.txt" \
-  "${CONFIG_DIR}/ftp_credentials.txt" \
-  "${CONFIG_DIR}/known_hosts"
+  "${CONFIG_DIR}/cp_credentials.txt"
 
 sudo chmod 640 \
   "${CONFIG_DIR}/settings.txt" \
-  "${CONFIG_DIR}/server.txt" \
-  "${CONFIG_DIR}/ftp_credentials.txt" \
-  "${CONFIG_DIR}/known_hosts"
+  "${CONFIG_DIR}/cp_credentials.txt"
 
 log_ok "Configuration file permissions set (root:phenocam, 640)"
-
-# Generate SSH key pair for SFTP only if not already present.
-if ! sudo test -f "${CONFIG_DIR}/keys/phenocam_key"; then
-  sudo ssh-keygen -t ed25519 \
-    -f "${CONFIG_DIR}/keys/phenocam_key" \
-    -N "" \
-    -C "phenocam@$(hostname)" \
-    -q
-
-  log_ok "SSH key pair generated: ${CONFIG_DIR}/keys/phenocam_key"
-else
-  log_ok "SSH key pair already exists — not regenerated"
-fi
-
-# Ensure the upload service user can read the SSH key pair.
-sudo chown phenocam:phenocam \
-  "${CONFIG_DIR}/keys/phenocam_key" \
-  "${CONFIG_DIR}/keys/phenocam_key.pub"
-
-sudo chmod 600 "${CONFIG_DIR}/keys/phenocam_key"
-sudo chmod 644 "${CONFIG_DIR}/keys/phenocam_key.pub"
-
-log_ok "SSH key permissions aligned for user phenocam"
-
-log_ok "SSH public key (send to SFTP server administrator if using SFTP):"
-echo ""
-sudo cat "${CONFIG_DIR}/keys/phenocam_key.pub"
-echo ""
 
 # ── Step 9 — Install systemd units and udev rules ─────────────────────────────
 log_step "Installing systemd units and udev rules..."
@@ -591,14 +659,20 @@ sudo udevadm control --reload-rules
 log_ok "udev rule installed and reloaded (USB hot-plug enabled)"
 
 # Reload systemd.
+# Generate stable calendar overrides from the persisted random minute.
+sudo env PHENOCAM_SCHEDULE_NO_RESTART=1 \
+  "${LIB_DIR}/bin/phenocam-configure-schedule.sh" >/dev/null 2>&1 || \
+  log_fatal "Could not configure the persistent capture/upload schedule."
+
 sudo systemctl daemon-reload
 log_ok "systemd daemon reloaded"
 
 # ── Step 10 — Enable runtime RAMDISK init and production timers ───────────────
 log_step "Enabling PhenoCam RAMDISK init..."
 
-sudo systemctl enable --now phenocam-init.service
-log_ok "phenocam-init.service: enabled and started (RAMDISK prepared)"
+sudo systemctl enable phenocam-init.service
+sudo systemctl restart phenocam-init.service
+log_ok "phenocam-init.service: enabled and executed (RAMDISK prepared)"
 
 # Check init result.
 if systemctl is-failed phenocam-init.service >/dev/null 2>&1; then
@@ -619,14 +693,16 @@ if [[ "${PHENOCAM_DISABLE_TIMERS:-0}" == "1" ]]; then
 
   log_warn "Production timers disabled because PHENOCAM_DISABLE_TIMERS=1"
   log_warn "Enable later with:"
-  log_warn "  sudo systemctl enable --now phenocam-startup-cycle.timer phenocam-capture.timer phenocam-upload.timer"
+  log_warn "  sudo systemctl enable --now phenocam-capture.timer phenocam-upload.timer"
 else
+  # The startup cycle remains available as an explicit diagnostic, but its
+  # timer is disabled so boot cannot create an off-schedule scientific image.
+  sudo systemctl disable --now phenocam-startup-cycle.timer >/dev/null 2>&1 || true
   sudo systemctl enable \
-    phenocam-startup-cycle.timer \
     phenocam-capture.timer \
     phenocam-upload.timer
 
-  log_ok "phenocam-startup-cycle.timer enabled for boot test cycle"
+  log_ok "phenocam-startup-cycle.timer disabled (manual diagnostic only)"
   log_ok "phenocam-capture.timer enabled for boot (regular capture cycles)"
   log_ok "phenocam-upload.timer enabled for boot (regular upload cycles)"
   log_warn "Timers are enabled for the next boot. They are not forced to run immediately by the installer."
@@ -641,36 +717,30 @@ echo ""
 
 # Remind about required configuration.
 echo -e "${YELLOW}${BOLD}  Required actions before the system can upload images:${NC}"
-echo -e "${YELLOW}  1. Set station name and timing/network parameters:${NC}"
+echo -e "${YELLOW}  1. Set station identity and Carbon Portal metadata:${NC}"
 echo -e "${GREEN}     sudo nano /etc/phenocam/settings.txt${NC}"
-echo -e "${YELLOW}     Edit SITENAME on line 1 at minimum.${NC}"
+echo -e "${YELLOW}     Configure SITENAME and fields 30-33 before ICOS upload.${NC}"
 echo ""
-echo -e "${YELLOW}  2. Choose at least one of your upload protocols:${NC}"
+echo -e "${YELLOW}  2. Add the station-specific staging account:${NC}"
+echo -e "${GREEN}     sudo nano /etc/phenocam/cp_credentials.txt${NC}"
+echo -e "${YELLOW}     Line 1: account email; line 2: password.${NC}"
 echo ""
-echo -e "${YELLOW}  FTP — edit credentials:${NC}"
-echo -e "${GREEN}     sudo nano /etc/phenocam/ftp_credentials.txt${NC}"
-echo -e "${YELLOW}     FTP port is configurable; use your provider value, even if it is different from 21.${NC}"
-echo ""
-echo -e "${YELLOW}  SFTP — SSH key, no password over network:${NC}"
-echo -e "${GREEN}     1. Send the public key printed above to your SFTP server administrator${NC}"
-echo -e "${GREEN}     2. sudo nano /etc/phenocam/server.txt  (add one or more server hostnames)${NC}"
-echo -e "${GREEN}     3. sudo ssh-keyscan -H <hostname> | sudo tee -a /etc/phenocam/known_hosts >/dev/null${NC}"
-echo -e "${GREEN}     4. Edit line 8 of settings.txt (SFTP_USER)${NC}"
-echo -e "${GREEN}     5. Edit line 14 of settings.txt (REMOTE_LAYOUT: general or icos)${NC}"
+echo -e "${YELLOW}  3. Apply timing changes after editing INTERVAL_MIN or CAPTURE_MINUTE:${NC}"
+echo -e "${GREEN}     sudo /usr/local/lib/phenocam/bin/phenocam-configure-schedule.sh${NC}"
 echo ""
 echo -e "${YELLOW}  Production timers:${NC}"
 echo -e "${GREEN}     Already enabled for boot by default.${NC}"
 echo -e "${GREEN}     Normal flow: configure files, then reboot.${NC}"
 echo -e "${GREEN}     Check boot enable state:${NC}"
-echo -e "${GREEN}     systemctl is-enabled phenocam-startup-cycle.timer phenocam-capture.timer phenocam-upload.timer${NC}"
+echo -e "${GREEN}     systemctl is-enabled phenocam-capture.timer phenocam-upload.timer${NC}"
 echo -e "${GREEN}     Check next runs:${NC}"
 echo -e "${GREEN}     systemctl list-timers 'phenocam-*' --all${NC}"
-echo -e "${GREEN}     Run startup test cycle immediately:${NC}"
+echo -e "${GREEN}     Run an explicit diagnostic capture/upload cycle:${NC}"
 echo -e "${GREEN}     sudo systemctl start phenocam-startup-cycle.service${NC}"
 echo -e "${GREEN}     Start regular timers immediately without reboot:${NC}"
 echo -e "${GREEN}     sudo systemctl start phenocam-capture.timer phenocam-upload.timer${NC}"
 echo -e "${GREEN}     To disable automatic operation:${NC}"
-echo -e "${GREEN}     sudo systemctl disable --now phenocam-startup-cycle.timer phenocam-capture.timer phenocam-upload.timer${NC}"
+echo -e "${GREEN}     sudo systemctl disable --now phenocam-capture.timer phenocam-upload.timer${NC}"
 echo ""
 
 # Check if reboot may be needed.
